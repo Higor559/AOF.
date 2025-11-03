@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Notícias Esportivas</title>
+  <style>
+    :root {
+      --bg: #0E1A2A;
+      --card-bg: #11233F;
+      --accent: #FF4C29;
+      --text: #FFF;
+      --text-muted: #CCC;
+      --shadow: rgba(0, 0, 0, 0.3);
+    }
+
+    body {
+      font-family: Segoe UI, Tahoma, Verdana, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      margin: 0;
+      padding: 20px;
+    }
+
+    h1 {
+      text-align: center;
+      margin-bottom: 30px;
+      color: var(--accent);
+    }
+
+    #listaNoticias {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 20px;
+    }
+
+    .noticia {
+      background: var(--card-bg);
+      border-radius: 12px;
+      overflow: hidden;
+      cursor: pointer;
+      transition: transform .3s, box-shadow .3s;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 0 4px 12px var(--shadow);
+    }
+
+    .noticia:hover {
+      transform: translateY(-5px);
+      box-shadow: 0 8px 20px var(--shadow);
+    }
+
+    .noticia img {
+      width: 100%;
+      object-fit: cover;
+      height: 180px;
+      border-bottom: 2px solid var(--accent);
+    }
+
+    .resumo {
+      padding: 15px;
+      flex-grow: 1;
+    }
+
+    .resumo p {
+      margin: 0;
+      color: var(--text-muted);
+      line-height: 1.5;
+    }
+
+    #paginaNoticia {
+      display: none;
+      margin-top: 20px;
+    }
+
+    #voltarBtn {
+      margin-bottom: 10px;
+      padding: 6px 12px;
+      cursor: pointer;
+      border: none;
+      border-radius: 5px;
+      background: #FF4C29;
+      color: #fff;
+    }
+
+    @media(max-width:600px) {
+      #listaNoticias {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+
+<body>
+
+  <h1>Últimas Notícias</h1>
+  <div id="listaNoticias"></div>
+
+  <div id="paginaNoticia">
+    <button id="voltarBtn">⬅ Voltar</button>
+    <div id="conteudoCompleto"></div>
+  </div>
+
+  <script>
+    const lista = document.getElementById('listaNoticias');
+    const paginaNoticia = document.getElementById('paginaNoticia');
+    const conteudoCompleto = document.getElementById('conteudoCompleto');
+    const voltarBtn = document.getElementById('voltarBtn');
+
+    const request = indexedDB.open("AOF_DB", 1);
+    request.onupgradeneeded = e => {
+      e.target.result.createObjectStore("noticias", { keyPath: "id", autoIncrement: true });
+    };
+    request.onsuccess = e => {
+      const db = e.target.result;
+      const tx = db.transaction("noticias", "readonly");
+      const store = tx.objectStore("noticias");
+      store.getAll().onsuccess = ev => {
+        const conteudos = ev.target.result;
+        if (conteudos.length === 0) {
+          lista.innerHTML = "<p>Nenhuma notícia publicada.</p>";
+          return;
+        }
+        conteudos.forEach(saved => {
+          const div = document.createElement('div');
+          div.className = 'noticia';
+
+          // Corrigido: pegar a primeira imagem corretamente
+          const primeiraImagem = saved.texto ? saved.texto.match(/<img.*?>/) : null;
+
+          div.innerHTML = `
+        ${primeiraImagem ? primeiraImagem[0] : ''}
+        <div class="resumo">
+          <p>${saved.titulo || saved.resumo || 'Sem título'}</p>
+        </div>
+      `;
+
+          div.onclick = () => mostrarNoticia(saved);
+          lista.appendChild(div);
+        });
+      };
+    };
+    request.onerror = e => {
+      console.error(e.target.error);
+      lista.innerHTML = "<p>Erro ao carregar notícias.</p>";
+    };
+
+    function mostrarNoticia(saved) {
+      lista.style.display = 'none';
+      paginaNoticia.style.display = 'block';
+      conteudoCompleto.innerHTML = `
+    <h2>${saved.titulo}</h2>
+    <div>${saved.texto}</div>
+    <p style="margin-top:15px;font-style:italic;">Resumo: ${saved.resumo}</p>
+  `;
+    }
+
+    voltarBtn.onclick = () => {
+      paginaNoticia.style.display = 'none';
+      lista.style.display = 'grid';
+    };
+  </script>
+
+</body>
+
+</html>
