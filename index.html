@@ -25,8 +25,73 @@
 
     h1 {
       text-align: center;
-      margin-bottom: 30px;
+      margin-bottom: 15px;
       color: var(--accent);
+    }
+
+    /* 🔹 Botão lateral */
+    #menuLateral {
+      position: fixed;
+      top: 50%;
+      left: 0;
+      transform: translateY(-50%);
+      background: var(--card-bg);
+      border-right: 2px solid var(--accent);
+      padding: 10px;
+      border-radius: 0 10px 10px 0;
+      box-shadow: 2px 2px 8px var(--shadow);
+      z-index: 999;
+    }
+
+    #menuLateral a {
+      color: var(--text);
+      text-decoration: none;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-weight: bold;
+      transition: color 0.3s, transform 0.2s;
+    }
+
+    #menuLateral a:hover {
+      color: var(--accent);
+      transform: translateX(3px);
+    }
+
+    #menuLateral img {
+      width: 22px;
+      height: 22px;
+      filter: brightness(0) invert(1);
+    }
+
+    /* Abas de categorias */
+    #abas {
+      display: flex;
+      justify-content: center;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 25px;
+    }
+
+    .aba {
+      background: var(--card-bg);
+      color: var(--text);
+      border: 1px solid var(--accent);
+      padding: 8px 14px;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: background 0.3s, transform 0.2s;
+    }
+
+    .aba:hover {
+      background: var(--accent);
+      color: #fff;
+      transform: translateY(-2px);
+    }
+
+    .aba.ativa {
+      background: var(--accent);
+      color: #fff;
     }
 
     #listaNoticias {
@@ -88,13 +153,39 @@
       #listaNoticias {
         grid-template-columns: 1fr;
       }
+      #menuLateral {
+        top: auto;
+        bottom: 10px;
+        left: 10px;
+        transform: none;
+        border-radius: 10px;
+      }
     }
   </style>
 </head>
 
 <body>
 
-  <h1>Últimas Notícias</h1>
+  <!-- 🔹 Menu lateral -->
+  <div id="menuLateral">
+    <a href="editor.html" title="Ir para o editor">
+      ✏️ Editor
+    </a>
+  </div>
+
+  <h1>🏆 Últimas Notícias</h1>
+
+  <!-- 🔹 Abas de temas -->
+  <div id="abas">
+    <div class="aba ativa" data-tema="todos">Todos</div>
+    <div class="aba" data-tema="Brasileirão">Brasileirão</div>
+    <div class="aba" data-tema="Premier League">Premier League</div>
+    <div class="aba" data-tema="Bundesliga">Bundesliga</div>
+    <div class="aba" data-tema="La Liga">La Liga</div>
+    <div class="aba" data-tema="Série A Italiana">Série A Italiana</div>
+    <div class="aba" data-tema="Outros">Outros</div>
+  </div>
+
   <div id="listaNoticias"></div>
 
   <div id="paginaNoticia">
@@ -107,61 +198,105 @@
     const paginaNoticia = document.getElementById('paginaNoticia');
     const conteudoCompleto = document.getElementById('conteudoCompleto');
     const voltarBtn = document.getElementById('voltarBtn');
+    const abas = document.querySelectorAll('.aba');
 
+    let noticias = [];
+
+    // 🧭 IndexedDB
     const request = indexedDB.open("AOF_DB", 1);
+
     request.onupgradeneeded = e => {
       e.target.result.createObjectStore("noticias", { keyPath: "id", autoIncrement: true });
     };
+
     request.onsuccess = e => {
       const db = e.target.result;
       const tx = db.transaction("noticias", "readonly");
       const store = tx.objectStore("noticias");
+
       store.getAll().onsuccess = ev => {
-        const conteudos = ev.target.result;
-        if (conteudos.length === 0) {
-          lista.innerHTML = "<p>Nenhuma notícia publicada.</p>";
-          return;
-        }
-        conteudos.forEach(saved => {
-          const div = document.createElement('div');
-          div.className = 'noticia';
-
-          // Corrigido: pegar a primeira imagem corretamente
-          const primeiraImagem = saved.texto ? saved.texto.match(/<img.*?>/) : null;
-
-          div.innerHTML = `
-        ${primeiraImagem ? primeiraImagem[0] : ''}
-        <div class="resumo">
-          <p>${saved.titulo || saved.resumo || 'Sem título'}</p>
-        </div>
-      `;
-
-          div.onclick = () => mostrarNoticia(saved);
-          lista.appendChild(div);
-        });
+        noticias = ev.target.result;
+        exibirNoticias('todos');
       };
     };
+
     request.onerror = e => {
       console.error(e.target.error);
       lista.innerHTML = "<p>Erro ao carregar notícias.</p>";
     };
 
+    // 📰 Exibir notícias filtradas
+    function exibirNoticias(filtroTema) {
+      lista.innerHTML = "";
+
+      if (noticias.length === 0) {
+        lista.innerHTML = "<p>Nenhuma notícia publicada.</p>";
+        return;
+      }
+
+      const filtradas = filtroTema === 'todos'
+        ? noticias
+        : noticias.filter(n => n.tema === filtroTema);
+
+      if (filtradas.length === 0) {
+        lista.innerHTML = `<p>Nenhuma notícia encontrada para <b>${filtroTema}</b>.</p>`;
+        return;
+      }
+
+      filtradas.forEach(saved => {
+        const div = document.createElement('div');
+        div.className = 'noticia';
+
+        // 🧩 Extrai a primeira imagem (se existir)
+        let primeiraImagemHTML = '';
+        if (saved.texto) {
+          const parser = new DOMParser();
+          const doc = parser.parseFromString(saved.texto, 'text/html');
+          const img = doc.querySelector('img');
+          if (img) primeiraImagemHTML = img.outerHTML;
+        }
+
+        div.innerHTML = `
+          ${primeiraImagemHTML}
+          <div class="resumo">
+            <p><b>${saved.titulo}</b></p>
+            <p>${saved.resumo}</p>
+          </div>
+        `;
+
+        div.onclick = () => mostrarNoticia(saved);
+        lista.appendChild(div);
+      });
+    }
+
+    // 📄 Mostrar notícia completa
     function mostrarNoticia(saved) {
       lista.style.display = 'none';
       paginaNoticia.style.display = 'block';
       conteudoCompleto.innerHTML = `
-    <h2>${saved.titulo}</h2>
-    <div>${saved.texto}</div>
-    <p style="margin-top:15px;font-style:italic;">Resumo: ${saved.resumo}</p>
-  `;
+        <h2>${saved.titulo}</h2>
+        <div>${saved.texto}</div>
+        <p style="margin-top:15px;font-style:italic;">Resumo: ${saved.resumo}</p>
+        <p style="color:#FF4C29;font-weight:bold;">Tema: ${saved.tema || 'Outros'}</p>
+      `;
     }
 
+    // 🔙 Voltar
     voltarBtn.onclick = () => {
       paginaNoticia.style.display = 'none';
       lista.style.display = 'grid';
     };
+
+    // 🏷️ Clique nas abas
+    abas.forEach(aba => {
+      aba.onclick = () => {
+        document.querySelector('.aba.ativa').classList.remove('ativa');
+        aba.classList.add('ativa');
+        const temaSelecionado = aba.dataset.tema;
+        exibirNoticias(temaSelecionado);
+      };
+    });
   </script>
 
 </body>
-
 </html>
