@@ -1,0 +1,914 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Notícias Esportivas - Home</title>
+  <style>
+    /* ===== Reset & base ===== */
+    * { box-sizing: border-box; }
+    html,body { height:100%; margin:0; padding:0; font-family: Inter, "Segoe UI", Roboto, Arial, sans-serif; background:#04060a; color:#e6f0ff; -webkit-font-smoothing:antialiased; }
+    a { color:inherit; text-decoration:none; }
+
+    /* ===== Layout ===== */
+    header {
+      display:flex; align-items:center; justify-content:space-between;
+      padding:18px 28px; gap:16px;
+      background:linear-gradient(180deg,#071224 0%, #041220 100%);
+      border-bottom:1px solid rgba(255,255,255,0.04);
+      position:sticky; top:0; z-index:50;
+    }
+    .brand { display:flex; gap:12px; align-items:center; }
+    .logo {
+      width:48px; height:48px; border-radius:8px;
+      background:linear-gradient(135deg,#0ea5ff,#005fcb);
+      display:flex; align-items:center; justify-content:center; font-weight:700;
+      box-shadow:0 6px 18px rgba(4,10,30,0.6);
+    }
+    h1 { margin:0; font-size:1.15rem; letter-spacing:0.2px; }
+
+    nav { display:flex; gap:12px; align-items:center; }
+    .btn {
+      background:transparent; border:1px solid rgba(255,255,255,0.06);
+      color:#cfeaff; padding:8px 12px; border-radius:8px; cursor:pointer;
+      font-weight:600; backdrop-filter: blur(4px);
+    }
+    .btn.primary {
+      background:linear-gradient(90deg,#0059b3,#0077e6);
+      border:none; color:white; box-shadow:0 8px 20px rgba(0,80,160,0.25);
+    }
+
+    main { max-width:1200px; margin:22px auto; padding:0 18px; display:grid; grid-template-columns: 1fr 360px; gap:20px; align-items:start; }
+
+    /* ===== Left column (content) ===== */
+    .panel {
+      background: linear-gradient(180deg, rgba(6,18,33,0.45), rgba(4,12,22,0.45));
+      border-radius:12px; padding:16px; box-shadow: 0 6px 30px rgba(0,0,0,0.6);
+      border:1px solid rgba(255,255,255,0.03);
+    }
+
+    /* Carousel (centralizado, com margens laterais) */
+    .carousel-wrap { display:flex; justify-content:center; }
+    .carousel {
+      width: 100%;
+      max-width: 900px;
+      position:relative; overflow:hidden; border-radius:10px; min-height:160px;
+      background:linear-gradient(180deg,#031b2b,#021420);
+    }
+    .carousel-track { display:flex; transition:transform 0.6s ease; will-change:transform; }
+    .carousel-item {
+      min-width:100%; padding:18px 20px; display:flex; gap:16px; align-items:center;
+    }
+    .carousel-image {
+      width:220px; height:120px; border-radius:10px; object-fit:cover; flex-shrink:0; box-shadow:0 8px 24px rgba(0,0,0,0.6);
+      border:1px solid rgba(255,255,255,0.03);
+    }
+    .carousel-content h3 { margin:0 0 8px 0; color:#dff3ff; font-size:1.05rem; }
+    .carousel-content p { margin:0; color:#bcdff6; opacity:0.9; font-size:0.95rem; max-height:80px; overflow:hidden; }
+
+    .carousel-controls { position:absolute; inset:0; pointer-events:none; display:flex; align-items:center; justify-content:space-between; padding:10px;}
+    .carousel-arrow {
+      pointer-events:auto; background:rgba(5,10,18,0.5); border:none; color:white; width:36px; height:36px; border-radius:8px;
+      display:flex; align-items:center; justify-content:center; cursor:pointer;
+      backdrop-filter: blur(4px);
+    }
+
+    /* News list — VERTICAL (uma abaixo da outra) */
+    .news-list { margin-top:18px; display:flex; flex-direction:column; gap:14px; }
+    .news-row {
+      background:linear-gradient(180deg, rgba(4,12,22,0.45), rgba(2,8,18,0.45));
+      border-radius:10px; padding:12px; display:flex; gap:12px; align-items:flex-start; cursor:pointer;
+      border:1px solid rgba(255,255,255,0.03);
+      transition:transform .12s ease, box-shadow .12s ease;
+    }
+    .news-row:hover { transform:translateY(-6px); box-shadow:0 18px 40px rgba(0,0,0,0.6); }
+    .news-thumb { width:160px; height:96px; border-radius:8px; object-fit:cover; flex-shrink:0; border:1px solid rgba(255,255,255,0.03); }
+    .news-meta h4 { margin:0; color:#e6f6ff; font-size:1.05rem; }
+    .news-meta p { margin:6px 0 0 0; color:#b7d8ff; font-size:0.95rem; opacity:0.95; }
+    .news-tags { margin-top:8px; display:flex; gap:6px; flex-wrap:wrap; }
+    .tag-pill { background:rgba(0,84,165,0.12); color:#e0f7ff; padding:4px 8px; border-radius:999px; font-size:0.8rem; border:1px solid rgba(0,150,220,0.06); }
+
+    /* Detail view em tela cheia (fundo sólido escuro) */
+    #detailView {
+      display:none;
+    }
+    #detailView.fullscreen {
+      position:fixed;
+      inset:0;
+      z-index:9999;
+      background: #04060a; /* fundo sólido escuro conforme solicitado */
+      overflow-y:auto;
+      padding:40px 24px;
+      display:block;
+    }
+    #detailCard {
+      max-width:1000px; margin:0 auto; background:transparent; border-radius:10px; color:#eaf8ff;
+    }
+    #detailCard h2 { margin-top:0; color:#e8f8ff; }
+    #detailCard .detail-meta { color:#9fcff6; margin-bottom:12px; }
+    #detailCard img { width:100%; max-height:520px; object-fit:cover; border-radius:10px; margin:12px 0; border:1px solid rgba(255,255,255,0.03); }
+
+    #backToList { margin-bottom:12px; }
+
+    /* ===== Right column (sidebar) ===== */
+    aside { display:flex; flex-direction:column; gap:16px; }
+
+    .tags-list { display:flex; flex-wrap:wrap; gap:8px; }
+    .tag-btn {
+      background:transparent; border:1px solid rgba(255,255,255,0.04); padding:8px 12px; border-radius:999px; cursor:pointer; font-weight:600;
+    }
+    .tag-btn.active { background:linear-gradient(90deg,#0059b3,#0077e6); color:white; border:none; box-shadow:0 8px 22px rgba(0,90,180,0.18); }
+
+    .searchbox { display:flex; gap:8px; align-items:center; }
+    .searchbox input { flex:1; padding:8px 10px; border-radius:10px; border:1px solid rgba(255,255,255,0.04); background:#021020; color:#cfeaff; }
+
+    .editor-panel { display:none; flex-direction:column; gap:10px; }
+    .field { display:flex; flex-direction:column; gap:6px; }
+    .field input[type="text"], .field textarea, .field select, .field input[type="url"] {
+      padding:8px 10px; border-radius:8px; border:1px solid rgba(255,255,255,0.04); background:#021726; color:#dff6ff;
+    }
+    .field textarea { min-height:110px; resize:vertical; }
+
+    .editor-actions { display:flex; gap:8px; justify-content:flex-end; }
+
+    /* small screens */
+    @media (max-width:980px) {
+      main { grid-template-columns: 1fr; padding:16px; }
+      .news-row { flex-direction:column; align-items:flex-start; }
+      .news-thumb { width:100%; height:200px; }
+      aside { order:-1; }
+      #detailView.fullscreen { padding:18px; }
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="brand">
+      <div class="logo">NS</div>
+      <div>
+        <h1>Notícias Esportivas</h1>
+        <div style="font-size:0.8rem;color:#9fcff6;margin-top:2px;">Painel de notícias • Tema escuro moderno</div>
+      </div>
+    </div>
+
+    <nav>
+      <button class="btn" id="allTagsBtn">Todas as Tags</button>
+      <button class="btn" id="editorToggleBtn">📝 Modo Editor</button>
+      <button class="btn primary" id="newPostBtn" title="Adicionar nova notícia">+ Nova Notícia</button>
+    </nav>
+  </header>
+
+  <main>
+    <!-- LEFT: content -->
+    <section>
+      <div class="panel">
+        <!-- CAROUSEL: notícias importantes (centralizado) -->
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+          <h2 style="margin:0;color:#dff3ff;">Destaques</h2>
+          <small style="color:#9fcff6;">carrossel automático</small>
+        </div>
+
+        <div class="carousel-wrap">
+          <div class="carousel" id="carousel">
+            <div class="carousel-track" id="carouselTrack">
+              <!-- itens gerados por JS -->
+            </div>
+            <div class="carousel-controls">
+              <button id="prevSlide" class="carousel-arrow" aria-label="Anterior">❮</button>
+              <button id="nextSlide" class="carousel-arrow" aria-label="Próximo">❯</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Lista de notícias (vertical) -->
+        <div style="display:flex; justify-content:space-between; align-items:end; margin-top:16px;">
+          <h3 style="margin:0;color:#dff3ff;">Últimas Notícias</h3>
+          <div style="color:#9fcff6;font-size:0.95rem;" id="currentFilterLabel">Todas</div>
+        </div>
+
+        <div class="news-list" id="newsList" style="margin-top:12px;">
+          <!-- linhas geradas por JS -->
+        </div>
+      </div>
+
+      <!-- Detalhe da notícia (visível quando abrir uma notícia) -->
+      <div id="detailView">
+        <div id="detailCard">
+          <div style="display:flex; justify-content:flex-start; gap:8px; margin-bottom:12px;">
+            <button class="btn" id="backToList">← Voltar</button>
+          </div>
+          <div id="detailContent" style="background:transparent; padding:12px; border-radius:8px;"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- RIGHT: sidebar -->
+    <aside>
+      <div class="panel">
+        <h4 style="margin:0 0 8px 0;color:#dff3ff;">Buscar</h4>
+        <div class="searchbox">
+          <input type="text" id="searchInput" placeholder="Pesquisar por título ou tag..." />
+          <button class="btn" id="searchBtn">🔍</button>
+        </div>
+
+        <hr style="border:none;border-top:1px solid rgba(255,255,255,0.03); margin:12px 0;">
+
+        <h4 style="margin:0 0 8px 0;color:#dff3ff;">Tags</h4>
+        <div class="tags-list" id="tagsList">
+          <!-- botões de tag fixos -->
+        </div>
+
+        <hr style="border:none;border-top:1px solid rgba(255,255,255,0.03); margin:12px 0;">
+
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+          <div style="font-weight:700;color:#cfeaff;">Editor</div>
+          <div style="font-size:0.85rem;color:#9fcff6">protegido</div>
+        </div>
+
+        <div id="editorPanel" class="editor-panel" style="margin-top:10px;">
+          <!-- Formulário do editor (aparece depois de autenticar) -->
+          <div class="field">
+            <label style="font-weight:700;color:#cfeaff;">Título</label>
+            <input type="text" id="editorTitle" placeholder="Título da notícia">
+          </div>
+
+          <div class="field">
+            <label style="font-weight:700;color:#cfeaff;">Tema (tag fixa)</label>
+            <select id="editorTag">
+              <!-- opções preenchidas por JS -->
+            </select>
+          </div>
+
+          <div class="field">
+            <label style="font-weight:700;color:#cfeaff;">Imagem (URL)</label>
+            <input type="url" id="editorImageUrl" placeholder="Cole o link da imagem (recomendado)">
+          </div>
+
+          <div class="field">
+            <label style="font-weight:700;color:#cfeaff;">Ou envie do dispositivo (opcional)</label>
+            <input type="file" id="editorImageFile" accept="image/*">
+          </div>
+
+          <div class="field">
+            <label style="font-weight:700;color:#cfeaff;">Conteúdo</label>
+            <textarea id="editorContent" placeholder="Conteúdo da notícia..."></textarea>
+          </div>
+
+          <div style="display:flex;gap:8px;align-items:center;">
+            <input type="checkbox" id="editorImportant">
+            <label for="editorImportant" style="margin:0;color:#9fcff6;">Marcar como importante (aparece no carrossel)</label>
+          </div>
+
+          <div class="editor-actions">
+            <button class="btn" id="cancelEdit">Cancelar</button>
+            <button class="btn primary" id="saveNewsBtn">Salvar Notícia</button>
+          </div>
+
+          <hr style="border:none;border-top:1px solid rgba(255,255,255,0.03); margin:12px 0;">
+
+          <h4 style="margin:0 0 8px 0;color:#dff3ff;">Notícias Cadastradas</h4>
+          <div id="editorNewsList" style="display:flex;flex-direction:column;gap:8px;max-height:240px;overflow:auto;"></div>
+        </div>
+      </div>
+
+      <div class="panel" style="text-align:center; font-size:0.9rem; color:#9fcff6;">
+        <div style="font-weight:700; margin-bottom:8px;">Dica</div>
+        Use o botão <strong>+ Nova Notícia</strong> ou o <strong>Modo Editor</strong> para gerenciar conteúdos. Tudo fica salvo localmente no navegador.
+      </div>
+    </aside>
+  </main>
+
+<script>
+/* ============================
+   Configurações iniciais
+   ============================ */
+
+const FIXED_TAGS = [
+  "Champions",
+  "Brasileirão",
+  "Premier League",
+  "Bundesliga",
+  "Copas",
+  "Libertadores",
+  "La Liga",
+  "Serie A"
+];
+
+const ADMIN_PASSWORD = "admin123"; // senha simples conforme combinado
+const AUTO_CAROUSEL_INTERVAL = 4000; // ms
+
+/* ============================
+   Elementos DOM
+   ============================ */
+const carouselTrack = document.getElementById('carouselTrack');
+const prevSlideBtn = document.getElementById('prevSlide');
+const nextSlideBtn = document.getElementById('nextSlide');
+const newsList = document.getElementById('newsList');
+const tagsList = document.getElementById('tagsList');
+const editorToggleBtn = document.getElementById('editorToggleBtn');
+const editorPanel = document.getElementById('editorPanel');
+const editorNewsList = document.getElementById('editorNewsList');
+const editorTagSelect = document.getElementById('editorTag');
+const saveNewsBtn = document.getElementById('saveNewsBtn');
+const cancelEditBtn = document.getElementById('cancelEdit');
+const newPostBtn = document.getElementById('newPostBtn');
+const allTagsBtn = document.getElementById('allTagsBtn');
+const currentFilterLabel = document.getElementById('currentFilterLabel');
+const detailView = document.getElementById('detailView');
+const detailContent = document.getElementById('detailContent');
+const backToListBtn = document.getElementById('backToList');
+const searchInput = document.getElementById('searchInput');
+const searchBtn = document.getElementById('searchBtn');
+const editorImageFile = document.getElementById('editorImageFile');
+
+const editorTitle = document.getElementById('editorTitle');
+const editorImageUrl = document.getElementById('editorImageUrl');
+const editorContent = document.getElementById('editorContent');
+const editorImportant = document.getElementById('editorImportant');
+
+let newsArray = JSON.parse(localStorage.getItem('newsArray') || '[]'); // array de notícias
+let filteredTag = null; // tag atual selecionada (null = todas)
+let carouselIndex = 0;
+let carouselTimer = null;
+let isAuthenticated = false; // flag: apenas quando usuário autenticou com senha
+
+/* ============================
+   Inicialização UI
+   ============================ */
+
+// Preenche lista de tags fixas no sidebar
+function initTagsUI() {
+  tagsList.innerHTML = '';
+  FIXED_TAGS.forEach(tag => {
+    const btn = document.createElement('button');
+    btn.className = 'tag-btn';
+    btn.textContent = tag;
+    btn.addEventListener('click', () => {
+      setFilterByTag(tag);
+    });
+    tagsList.appendChild(btn);
+  });
+  // "Todas as Tags" botão também no topo
+  allTagsBtn.addEventListener('click', () => {
+    setFilterByTag(null);
+  });
+
+  // Popula select do editor
+  editorTagSelect.innerHTML = `<option value="" disabled selected>Selecione uma tag</option>` +
+    FIXED_TAGS.map(t => `<option value="${t}">${t}</option>`).join('');
+}
+
+// Chamada inicial
+initTagsUI();
+
+/* ============================
+   Salvamento / leitura
+   ============================ */
+
+function saveToStorage() {
+  localStorage.setItem('newsArray', JSON.stringify(newsArray));
+}
+
+function generateId() {
+  // id simples incremental (timestamp + random)
+  return Date.now().toString(36) + Math.random().toString(36).slice(2,8);
+}
+
+/* ============================
+   Render: CAROUSEL e LIST
+   ============================ */
+
+function renderCarousel() {
+  const important = newsArray.filter(n => n.isImportant);
+  if (important.length === 0) {
+    carouselTrack.innerHTML = `<div style="padding:28px;color:#9fcff6;">Nenhuma notícia destacada.</div>`;
+    return;
+  }
+  carouselTrack.innerHTML = '';
+  important.forEach((n, idx) => {
+    const item = document.createElement('div');
+    item.className = 'carousel-item';
+    item.innerHTML = `
+      <img class="carousel-image" src="${n.image || ''}" alt="" onerror="this.style.display='none'">
+      <div class="carousel-content">
+        <div style="font-size:0.9rem;color:#88d0ff;margin-bottom:6px;">${n.theme}</div>
+        <h3>${escapeHtml(n.title)}</h3>
+        <p>${truncateText(stripHtml(n.content), 200)}</p>
+      </div>
+    `;
+    item.addEventListener('click', () => openDetailById(n.id));
+    carouselTrack.appendChild(item);
+  });
+
+  // reset index if out of bounds
+  if (carouselIndex >= important.length) carouselIndex = 0;
+  updateCarouselPosition();
+
+  // start auto rotate
+  startCarouselAuto();
+}
+
+function updateCarouselPosition() {
+  carouselTrack.style.transform = `translateX(-${carouselIndex * 100}%)`;
+}
+
+function startCarouselAuto() {
+  stopCarouselAuto();
+  carouselTimer = setInterval(() => {
+    const important = newsArray.filter(n => n.isImportant);
+    if (important.length <= 1) return;
+    carouselIndex = (carouselIndex + 1) % important.length;
+    updateCarouselPosition();
+  }, AUTO_CAROUSEL_INTERVAL);
+}
+
+function stopCarouselAuto() {
+  if (carouselTimer) {
+    clearInterval(carouselTimer);
+    carouselTimer = null;
+  }
+}
+
+/* next / prev */
+nextSlideBtn.addEventListener('click', () => {
+  const important = newsArray.filter(n => n.isImportant);
+  if (important.length <= 1) return;
+  carouselIndex = (carouselIndex + 1) % important.length;
+  updateCarouselPosition();
+  startCarouselAuto();
+});
+prevSlideBtn.addEventListener('click', () => {
+  const important = newsArray.filter(n => n.isImportant);
+  if (important.length <= 1) return;
+  carouselIndex = (carouselIndex - 1 + important.length) % important.length;
+  updateCarouselPosition();
+  startCarouselAuto();
+});
+
+/* pause on hover */
+document.getElementById('carousel').addEventListener('mouseenter', stopCarouselAuto);
+document.getElementById('carousel').addEventListener('mouseleave', startCarouselAuto);
+
+/* ============================
+   Render: news list (vertical)
+   ============================ */
+
+function renderNewsList() {
+  const query = (searchInput.value || '').trim().toLowerCase();
+  let visible = newsArray.slice(); // copy
+
+  // filter by tag
+  if (filteredTag) {
+    visible = visible.filter(n => n.theme === filteredTag);
+  }
+
+  // search filter
+  if (query) {
+    visible = visible.filter(n => (n.title && n.title.toLowerCase().includes(query)) ||
+                                  (n.tags && n.tags.join(' ').toLowerCase().includes(query)) ||
+                                  (n.content && n.content.toLowerCase().includes(query)));
+  }
+
+  // Sort: important first, then newest
+  visible.sort((a,b) => {
+    if (a.isImportant && !b.isImportant) return -1;
+    if (!a.isImportant && b.isImportant) return 1;
+    return b.createdAt - a.createdAt;
+  });
+
+  newsList.innerHTML = '';
+  if (visible.length === 0) {
+    newsList.innerHTML = `<div style="color:#9fcff6">Nenhuma notícia encontrada.</div>`;
+    return;
+  }
+
+  visible.forEach(n => {
+    const row = document.createElement('div');
+    row.className = 'news-row';
+    row.innerHTML = `
+      ${n.image ? `<img class="news-thumb" src="${n.image}" onerror="this.style.display='none'">` : `<div style="width:160px;height:96px;border-radius:8px;background:linear-gradient(90deg,#071826,#022535);display:flex;align-items:center;justify-content:center;color:#7fbff7;border:1px solid rgba(255,255,255,0.02)">SEM IMG</div>`}
+      <div class="news-meta" style="flex:1">
+        <h4>${escapeHtml(n.title)}</h4>
+        <div style="font-size:0.9rem;color:#9fcff6;margin-top:6px;">${n.theme} • ${formatDate(n.createdAt)}</div>
+        <p style="margin-top:8px;color:#bfe9ff;opacity:0.95;">${truncateText(stripHtml(n.content), 180)}</p>
+        <div class="news-tags">${(n.tags || []).map(t => `<span class="tag-pill">#${t}</span>`).join('')}</div>
+      </div>
+    `;
+    // abre detail em tela cheia ao clicar
+    row.addEventListener('click', () => openDetailById(n.id));
+    newsList.appendChild(row);
+  });
+}
+
+/* ============================
+   Filtrar por tag
+   ============================ */
+
+function setFilterByTag(tag) {
+  filteredTag = tag;
+  const label = tag || 'Todas';
+  currentFilterLabel.textContent = label;
+  // atualizar visual dos botões
+  Array.from(document.querySelectorAll('.tag-btn')).forEach(btn => {
+    btn.classList.toggle('active', btn.textContent.startsWith(tag || tag)); // will be updated by renderTagCounts
+  });
+  // update top "Todas as Tags" btn style
+  allTagsBtn.classList.toggle('active', !tag);
+  renderNewsList();
+}
+
+/* ============================
+   Editor: autenticação e manipulação
+   ============================ */
+
+editorToggleBtn.addEventListener('click', () => {
+  // pede senha via prompt somente quando clicar
+  const pwd = prompt('Digite a senha do editor:');
+  if (pwd === null) return; // cancelado
+  if (pwd === ADMIN_PASSWORD) {
+    // habilitar editor
+    isAuthenticated = true;
+    editorPanel.style.display = 'flex';
+    editorPanel.scrollIntoView({behavior:'smooth', block:'center'});
+    renderEditorNewsList();
+    renderAll(); // atualiza interface (botões de editar/excluir no detalhe)
+    alert('Editor desbloqueado.');
+  } else {
+    alert('Senha incorreta.');
+  }
+});
+
+/* botão + Nova Notícia também abre editor (se não autenticado pede senha) */
+newPostBtn.addEventListener('click', () => {
+  if (!isAuthenticated) {
+    editorToggleBtn.click();
+    // slight delay to ensure editor shows before clearing
+    setTimeout(() => openEditorForNew(), 250);
+  } else {
+    openEditorForNew();
+  }
+});
+
+function openEditorForNew() {
+  // limpa campos para uma nova notícia
+  editorTitle.value = '';
+  editorImageUrl.value = '';
+  editorContent.value = '';
+  editorImportant.checked = false;
+  editorTagSelect.value = '';
+  editorImageFile.value = '';
+  editorPanel.style.display = 'flex';
+}
+
+/* salvar notícia */
+saveNewsBtn.addEventListener('click', async (e) => {
+  e.preventDefault();
+  const title = (editorTitle.value || '').trim();
+  const theme = (editorTagSelect.value || '').trim();
+  const content = (editorContent.value || '').trim();
+
+  if (!title || !theme || !content) {
+    alert('Preencha título, tema e conteúdo.');
+    return;
+  }
+
+  let image = '';
+  // se enviou arquivo, converte para dataURL
+  const file = editorImageFile.files && editorImageFile.files[0];
+  if (file) {
+    try {
+      image = await fileToDataUrl(file);
+    } catch (err) {
+      console.error(err);
+      image = editorImageUrl.value.trim() || '';
+    }
+  } else {
+    image = editorImageUrl.value.trim() || '';
+  }
+
+  const newsItem = {
+    id: generateId(),
+    title,
+    theme,
+    image,
+    content,
+    tags: [theme],
+    isImportant: !!editorImportant.checked,
+    createdAt: Date.now()
+  };
+
+  // adicionar ao início para aparecer primeiro
+  newsArray.unshift(newsItem);
+  saveToStorage();
+  renderAll();
+  openEditorForNew();
+  renderEditorNewsList();
+  alert('Notícia salva!');
+});
+
+/* cancelar edição */
+cancelEditBtn.addEventListener('click', (e) => {
+  e.preventDefault();
+  editorTitle.value = '';
+  editorImageUrl.value = '';
+  editorContent.value = '';
+  editorImportant.checked = false;
+  editorTagSelect.value = '';
+  editorImageFile.value = '';
+});
+
+/* lista de notícias no painel do editor para excluir ou editar (só visível quando autenticado) */
+function renderEditorNewsList() {
+  editorNewsList.innerHTML = '';
+  if (!newsArray.length) {
+    editorNewsList.innerHTML = `<div style="color:#9fcff6">Nenhuma notícia cadastrada.</div>`;
+    return;
+  }
+  newsArray.forEach((n, idx) => {
+    const row = document.createElement('div');
+    row.style.display = 'flex';
+    row.style.justifyContent = 'space-between';
+    row.style.alignItems = 'center';
+    row.style.padding = '6px';
+    row.style.borderRadius = '6px';
+    row.style.border = '1px solid rgba(255,255,255,0.02)';
+    row.style.background = 'linear-gradient(180deg, rgba(3,8,14,0.12), rgba(2,6,10,0.08))';
+
+    const left = document.createElement('div');
+    left.innerHTML = `<div style="font-weight:700;color:#dff3ff">${escapeHtml(n.title)}</div><div style="font-size:0.85rem;color:#9fcff6">${n.theme} • ${formatDate(n.createdAt)}</div>`;
+
+    const actions = document.createElement('div');
+    actions.style.display = 'flex';
+    actions.style.gap = '8px';
+
+    const editBtn = document.createElement('button');
+    editBtn.className = 'btn';
+    editBtn.textContent = 'Editar';
+    editBtn.addEventListener('click', () => openEditorForEdit(n.id));
+
+    const delBtn = document.createElement('button');
+    delBtn.className = 'btn';
+    delBtn.style.background = '#b51b1b';
+    delBtn.style.color = 'white';
+    delBtn.textContent = 'Excluir';
+    delBtn.addEventListener('click', () => {
+      if (confirm('Deseja realmente excluir esta notícia?')) {
+        newsArray = newsArray.filter(item => item.id !== n.id);
+        saveToStorage();
+        renderAll();
+        renderEditorNewsList();
+      }
+    });
+
+    actions.appendChild(editBtn);
+    actions.appendChild(delBtn);
+    row.appendChild(left);
+    row.appendChild(actions);
+    editorNewsList.appendChild(row);
+  });
+}
+
+function openEditorForEdit(id) {
+  const n = newsArray.find(x => x.id === id);
+  if (!n) return alert('Notícia não encontrada.');
+  editorTitle.value = n.title;
+  editorTagSelect.value = n.theme;
+  editorImageUrl.value = n.image || '';
+  editorContent.value = n.content;
+  editorImportant.checked = !!n.isImportant;
+  editorImageFile.value = '';
+
+  // set save button to update this item
+  const originalHandler = saveNewsBtn.onclick;
+  saveNewsBtn.onclick = async (ev) => {
+    ev.preventDefault();
+    const title = (editorTitle.value || '').trim();
+    const theme = (editorTagSelect.value || '').trim();
+    const content = (editorContent.value || '').trim();
+    if (!title || !theme || !content) {
+      alert('Preencha título, tema e conteúdo.');
+      return;
+    }
+    let image = '';
+    const file = editorImageFile.files && editorImageFile.files[0];
+    if (file) {
+      image = await fileToDataUrl(file);
+    } else {
+      image = editorImageUrl.value.trim() || '';
+    }
+
+    // atualizar
+    n.title = title;
+    n.theme = theme;
+    n.image = image;
+    n.content = content;
+    n.isImportant = !!editorImportant.checked;
+    n.tags = [theme];
+    saveToStorage();
+    renderAll();
+    renderEditorNewsList();
+    alert('Notícia atualizada!');
+    // restaurar handler padrão
+    saveNewsBtn.onclick = originalHandler;
+  };
+}
+
+/* conversão de file para dataURL */
+function fileToDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const fr = new FileReader();
+    fr.onload = () => resolve(fr.result);
+    fr.onerror = reject;
+    fr.readAsDataURL(file);
+  });
+}
+
+/* ============================
+   Detalhe da notícia (página dinâmica em tela cheia)
+   ============================ */
+
+function openDetailById(id) {
+  const item = newsArray.find(n => n.id === id);
+  if (!item) return alert('Notícia não encontrada.');
+
+  // Mostrar em tela cheia
+  detailView.classList.add('fullscreen');
+
+  detailContent.innerHTML = `
+    <div style="background:transparent; padding:18px; border-radius:8px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;">
+        <div>
+          <div style="font-size:0.95rem;color:#88d0ff;margin-bottom:6px;">${item.theme}</div>
+          <h2>${escapeHtml(item.title)}</h2>
+          <div class="detail-meta">${formatDate(item.createdAt)}</div>
+        </div>
+        <div style="text-align:right;">
+          ${isAuthenticated ? `<button class="btn" id="editThisBtn" style="margin-bottom:6px;">Editar</button>
+          <button class="btn" id="deleteThisBtn" style="background:#b30000;color:white;">Excluir</button>` : ''}
+        </div>
+      </div>
+
+      ${item.image ? `<img src="${item.image}" alt="imagem" onerror="this.style.display='none'">` : ''}
+      <div style="color:#dff7ff; white-space:pre-line; margin-top:12px;">${escapeHtmlPreserveNewlines(item.content)}</div>
+      <div style="margin-top:12px;">${(item.tags||[]).map(t => `<span class="tag-pill">#${t}</span>`).join('')}</div>
+    </div>
+  `;
+
+  // attach actions only if authenticated
+  if (isAuthenticated) {
+    const editBtn = document.getElementById('editThisBtn');
+    const delBtn = document.getElementById('deleteThisBtn');
+    if (editBtn) {
+      editBtn.addEventListener('click', () => {
+        editorPanel.style.display = 'flex';
+        openEditorForEdit(item.id);
+        // scroll editor into view (sidebar)
+        editorPanel.scrollIntoView({behavior:'smooth', block:'center'});
+      });
+    }
+    if (delBtn) {
+      delBtn.addEventListener('click', () => {
+        if (confirm('Deseja excluir esta notícia?')) {
+          newsArray = newsArray.filter(n => n.id !== item.id);
+          saveToStorage();
+          renderAll();
+          renderEditorNewsList();
+          closeDetail();
+        }
+      });
+    }
+  }
+
+  // scroll to top of fullscreen
+  detailView.scrollTop = 0;
+}
+
+/* voltar */
+backToListBtn.addEventListener('click', closeDetail);
+function closeDetail() {
+  detailView.classList.remove('fullscreen');
+  detailContent.innerHTML = '';
+  // scroll to top of main content
+  document.querySelector('main').scrollIntoView({behavior:'smooth', block:'start'});
+}
+
+/* ============================
+   Busca
+   ============================ */
+searchBtn.addEventListener('click', () => {
+  renderNewsList();
+});
+
+searchInput.addEventListener('keypress', (e) => {
+  if (e.key === 'Enter') renderNewsList();
+});
+
+/* ============================
+   Utilitários & helpers
+   ============================ */
+
+function renderAll() {
+  renderCarousel();
+  renderNewsList();
+  renderEditorNewsList(); // safe: editor list só aparece se autenticado
+  renderTagCounts();
+}
+
+function formatDate(ts) {
+  const d = new Date(ts);
+  return `${d.getDate().toString().padStart(2,'0')}/${(d.getMonth()+1).toString().padStart(2,'0')}/${d.getFullYear()} ${d.getHours().toString().padStart(2,'0')}:${d.getMinutes().toString().padStart(2,'0')}`;
+}
+
+function truncateText(text, n) {
+  if (!text) return '';
+  return text.length > n ? text.slice(0,n-1) + '…' : text;
+}
+
+function stripHtml(html) {
+  return (html || '').replace(/<[^>]*>/g, '');
+}
+
+function escapeHtml(text) {
+  if (!text) return '';
+  return text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
+function escapeHtmlPreserveNewlines(text) {
+  return escapeHtml(text).replace(/\n/g, '<br>');
+}
+
+/* mostra contagem por tag na sidebar (opcional) */
+function renderTagCounts() {
+  const counts = {};
+  FIXED_TAGS.forEach(t => counts[t] = 0);
+  newsArray.forEach(n => {
+    if (n.theme && counts[n.theme] !== undefined) counts[n.theme] += 1;
+  });
+
+  // atualiza visual dos botões
+  const btns = document.querySelectorAll('.tag-btn');
+  btns.forEach(btn => {
+    const base = btn.textContent.split(' (')[0];
+    const count = counts[base] || 0;
+    btn.textContent = `${base} (${count})`;
+    btn.classList.toggle('active', filteredTag === base);
+  });
+}
+
+/* safety: strip potential HTML from inputs when rendering lists; use escapeHtml when necessary */
+
+/* ============================
+   Inicialização final
+   ============================ */
+
+// preencher selects e listas e render inicial
+function bootstrap() {
+  renderAll();
+  // marcar "Todas" ativo
+  allTagsBtn.classList.add('active');
+  setFilterByTag(null);
+}
+
+bootstrap();
+
+/* ============================
+   Exemplos iniciais (apenas se não houver notícias)
+   ============================ */
+if (!newsArray.length) {
+  const sample = [
+    {
+      id: generateId(), title: 'Final eletrizante na Champions League',
+      theme: 'Champions', image: '', content: 'Uma final memorável com virada nos acréscimos.',
+      tags: ['Champions'], isImportant: true, createdAt: Date.now()-1000*60*60*24
+    },
+    {
+      id: generateId(), title: 'Brasileirão esquenta a disputa',
+      theme: 'Brasileirão', image: '', content: 'Clássico decidido por um pênalti nos últimos minutos.',
+      tags: ['Brasileirão'], isImportant: false, createdAt: Date.now()-1000*60*60*8
+    }
+  ];
+  newsArray = sample.concat(newsArray);
+  saveToStorage();
+  renderAll();
+}
+
+/* ============================
+   Pequenas proteções
+   ============================ */
+window.addEventListener('beforeunload', () => {
+  saveToStorage();
+});
+
+/* ============================
+   Fim
+   ============================ */
+</script>
+
+</body>
+</html>
