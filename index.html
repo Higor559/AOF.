@@ -239,7 +239,7 @@
         : noticias.filter(n => n.tema === filtroTema);
 
       if (filtradas.length === 0) {
-        lista.innerHTML = `<p>Nenhuma notícia encontrada para <b>${filtroTema}</b>.</p>`;
+        lista.innerHTML = <p>Nenhuma notícia encontrada para <b>${filtroTema}</b>.</p>;
         return;
       }
 
@@ -270,16 +270,27 @@
     }
 
     // 📄 Mostrar notícia completa
-    function mostrarNoticia(saved) {
-      lista.style.display = 'none';
-      paginaNoticia.style.display = 'block';
-      conteudoCompleto.innerHTML = `
-        <h2>${saved.titulo}</h2>
-        <div>${saved.texto}</div>
-        <p style="margin-top:15px;font-style:italic;">Resumo: ${saved.resumo}</p>
-        <p style="color:#FF4C29;font-weight:bold;">Tema: ${saved.tema || 'Outros'}</p>
-      `;
-    }
+ function mostrarNoticia(saved) {
+  lista.style.display = 'none';
+  paginaNoticia.style.display = 'block';
+
+  // Renderiza corretamente o texto com imagens
+  conteudoCompleto.innerHTML = `
+    <h2>${saved.titulo}</h2>
+    <div class="conteudoNoticia">${saved.texto}</div>
+    <p style="margin-top:15px;font-style:italic;">Resumo: ${saved.resumo}</p>
+    <p style="color:#FF4C29;font-weight:bold;">Tema: ${saved.tema || 'Outros'}</p>
+  `;
+
+  // Garante que todas as imagens fiquem responsivas
+  const imgs = conteudoCompleto.querySelectorAll('.conteudoNoticia img');
+  imgs.forEach(img => {
+    img.style.maxWidth = '100%';
+    img.style.height = 'auto';
+    img.style.borderRadius = '8px';
+    img.style.margin = '10px 0';
+  });
+}
 
     // 🔙 Voltar
     voltarBtn.onclick = () => {
