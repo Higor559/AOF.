@@ -126,11 +126,11 @@
   <script>
     // ---------- Autorização ----------
     const senhaEditor = "meusite2025";
+    const s = prompt("Digite a senha do editor:");
     if (s !== senhaEditor) {
-  alert("Acesso negado!");
-  const base = window.location.origin + window.location.pathname.replace(/[^/]+$/, "");
- window.location.href = "/index.html";
-}
+      alert("Acesso negado!");
+      window.location.href = "index.html";
+    }
 
     // ---------- Formatação ----------
     function execCmd(cmd) { document.execCommand(cmd, false, null); }
