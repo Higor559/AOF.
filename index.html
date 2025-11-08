@@ -96,7 +96,7 @@
       position:fixed;
       inset:0;
       z-index:9999;
-      background: #04060a; /* fundo sólido escuro conforme solicitado */
+      background: #04060a;
       overflow-y:auto;
       padding:40px 24px;
       display:block;
@@ -171,9 +171,7 @@
 
         <div class="carousel-wrap">
           <div class="carousel" id="carousel">
-            <div class="carousel-track" id="carouselTrack">
-              <!-- itens gerados por JS -->
-            </div>
+            <div class="carousel-track" id="carouselTrack"></div>
             <div class="carousel-controls">
               <button id="prevSlide" class="carousel-arrow" aria-label="Anterior">❮</button>
               <button id="nextSlide" class="carousel-arrow" aria-label="Próximo">❯</button>
@@ -187,9 +185,7 @@
           <div style="color:#9fcff6;font-size:0.95rem;" id="currentFilterLabel">Todas</div>
         </div>
 
-        <div class="news-list" id="newsList" style="margin-top:12px;">
-          <!-- linhas geradas por JS -->
-        </div>
+        <div class="news-list" id="newsList" style="margin-top:12px;"></div>
       </div>
 
       <!-- Detalhe da notícia (visível quando abrir uma notícia) -->
@@ -215,9 +211,7 @@
         <hr style="border:none;border-top:1px solid rgba(255,255,255,0.03); margin:12px 0;">
 
         <h4 style="margin:0 0 8px 0;color:#dff3ff;">Tags</h4>
-        <div class="tags-list" id="tagsList">
-          <!-- botões de tag fixos -->
-        </div>
+        <div class="tags-list" id="tagsList"></div>
 
         <hr style="border:none;border-top:1px solid rgba(255,255,255,0.03); margin:12px 0;">
 
@@ -227,7 +221,6 @@
         </div>
 
         <div id="editorPanel" class="editor-panel" style="margin-top:10px;">
-          <!-- Formulário do editor (aparece depois de autenticar) -->
           <div class="field">
             <label style="font-weight:700;color:#cfeaff;">Título</label>
             <input type="text" id="editorTitle" placeholder="Título da notícia">
@@ -235,9 +228,7 @@
 
           <div class="field">
             <label style="font-weight:700;color:#cfeaff;">Tema (tag fixa)</label>
-            <select id="editorTag">
-              <!-- opções preenchidas por JS -->
-            </select>
+            <select id="editorTag"></select>
           </div>
 
           <div class="field">
@@ -274,20 +265,15 @@
 
       <div class="panel" style="text-align:center; font-size:0.9rem; color:#9fcff6;">
         <div style="font-weight:700; margin-bottom:8px;">Dica</div>
-        Use o botão <strong>+ Nova Notícia</strong> ou o <strong>Modo Editor</strong> para gerenciar conteúdos. Tudo fica salvo localmente no navegador.
+        Use o botão <strong>+ Nova Notícia</strong> ou o <strong>Modo Editor</strong> para gerenciar conteúdos. Tudo fica salvo no Firestore.
       </div>
     </aside>
   </main>
 
-<!-- ============================
-     SCRIPT PRINCIPAL (agora como module — integra Firebase)
-     ============================ -->
 <script type="module">
 /* ============================
-   Firebase: App, Analytics, Firestore, Storage
+   Firebase (CDN modules)
    ============================ */
-
-/* IMPORTS (CDN oficial) */
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-app.js";
 import { getAnalytics } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-analytics.js";
 import {
@@ -298,7 +284,7 @@ import {
   getStorage, ref as storageRef, uploadBytes, getDownloadURL, deleteObject
 } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-storage.js";
 
-/* Seu Firebase config (mantive a sua) */
+/* Seu Firebase config */
 const firebaseConfig = {
   apiKey: "AIzaSyB4OI3ztWRTYyUahJ9PKmzSpRkFvD9p73s",
   authDomain: "aofweb-8ece3.firebaseapp.com",
@@ -309,22 +295,14 @@ const firebaseConfig = {
   measurementId: "G-L1PCBJ05GC"
 };
 
-/* Inicializa Firebase */
 const firebaseApp = initializeApp(firebaseConfig);
 const analytics = getAnalytics(firebaseApp);
 const db = getFirestore(firebaseApp);
 const storage = getStorage(firebaseApp);
 
-/* Disponibiliza globalmente se quiser inspecionar via console */
-window.firebaseApp = firebaseApp;
-window.firebaseAnalytics = analytics;
-window.firebaseDb = db;
-window.firebaseStorage = storage;
-
 /* ============================
-   Configurações iniciais (UI e lógica)
+   Configurações iniciais
    ============================ */
-
 const FIXED_TAGS = [
   "Champions",
   "Brasileirão",
@@ -335,13 +313,10 @@ const FIXED_TAGS = [
   "La Liga",
   "Serie A"
 ];
+const ADMIN_PASSWORD = "admin123";
+const AUTO_CAROUSEL_INTERVAL = 4000;
 
-const ADMIN_PASSWORD = "admin123"; // senha simples conforme combinado
-const AUTO_CAROUSEL_INTERVAL = 4000; // ms
-
-/* ============================
-   Elementos DOM
-   ============================ */
+/* DOM */
 const carouselTrack = document.getElementById('carouselTrack');
 const prevSlideBtn = document.getElementById('prevSlide');
 const nextSlideBtn = document.getElementById('nextSlide');
@@ -368,75 +343,61 @@ const editorImageUrl = document.getElementById('editorImageUrl');
 const editorContent = document.getElementById('editorContent');
 const editorImportant = document.getElementById('editorImportant');
 
-let newsArray = []; // agora vindo do Firestore
-let filteredTag = null; // tag atual selecionada (null = todas)
+let newsArray = [];
+let filteredTag = null;
 let carouselIndex = 0;
 let carouselTimer = null;
-let isAuthenticated = false; // flag: apenas quando usuário autenticou com senha
+let isAuthenticated = false;
 
 /* ============================
-   Inicialização UI
+   UI init
    ============================ */
-
 function initTagsUI() {
   tagsList.innerHTML = '';
   FIXED_TAGS.forEach(tag => {
     const btn = document.createElement('button');
     btn.className = 'tag-btn';
     btn.textContent = tag;
-    btn.addEventListener('click', () => {
-      setFilterByTag(tag);
-    });
+    btn.addEventListener('click', () => setFilterByTag(tag));
     tagsList.appendChild(btn);
   });
-  allTagsBtn.addEventListener('click', () => {
-    setFilterByTag(null);
-  });
+  allTagsBtn.addEventListener('click', () => setFilterByTag(null));
   editorTagSelect.innerHTML = `<option value="" disabled selected>Selecione uma tag</option>` +
     FIXED_TAGS.map(t => `<option value="${t}">${t}</option>`).join('');
 }
 initTagsUI();
 
 /* ============================
-   Helpers Firestore <-> UI
-   ============================ */
-
-function docToNews(docSnap) {
-  const d = docSnap.data();
-  const createdAt = d && d.createdAt && typeof d.createdAt.toMillis === 'function'
-    ? d.createdAt.toMillis()
-    : (d.createdAt || Date.now());
-  return {
-    id: docSnap.id,
-    title: d.title || '',
-    theme: d.theme || '',
-    image: d.image || '',
-    imagePath: d.imagePath || null, // caminho no Storage (se houver)
-    content: d.content || '',
-    tags: d.tags || [],
-    isImportant: !!d.isImportant,
-    createdAt
-  };
-}
-
-/* ============================
-   Observando coleção 'news' (em tempo real)
+   Firestore listener (realtime)
    ============================ */
 const newsCollection = collection(db, 'news');
 const newsQuery = query(newsCollection, orderBy('createdAt', 'desc'));
 onSnapshot(newsQuery, (snapshot) => {
-  newsArray = snapshot.docs.map(docToNews);
-  // se não tiver notícias, não sobrescreve o sample (vamos manter o sample inicial em Firestore só se necessário)
+  newsArray = snapshot.docs.map(docSnap => {
+    const d = docSnap.data();
+    const createdAt = d && d.createdAt && typeof d.createdAt.toMillis === 'function'
+      ? d.createdAt.toMillis()
+      : (d.createdAt || Date.now());
+    return {
+      id: docSnap.id,
+      title: d.title || '',
+      theme: d.theme || '',
+      image: d.image || '',
+      imagePath: d.imagePath || null,
+      content: d.content || '',
+      tags: d.tags || [],
+      isImportant: !!d.isImportant,
+      createdAt
+    };
+  });
   renderAll();
 }, (err) => {
   console.error('Erro ao receber notícias do Firestore:', err);
-  // em caso de erro, pode-se considerar fallback para localStorage (omiti para manter o Firestore como fonte única)
 });
 
 /* ============================
-   Render: CAROUSEL e LIST (mantive suas funções)
+   Render functions
    ============================ */
-
 function renderCarousel() {
   const important = newsArray.filter(n => n.isImportant);
   if (important.length === 0) {
@@ -444,7 +405,7 @@ function renderCarousel() {
     return;
   }
   carouselTrack.innerHTML = '';
-  important.forEach((n, idx) => {
+  important.forEach((n) => {
     const item = document.createElement('div');
     item.className = 'carousel-item';
     item.innerHTML = `
@@ -458,16 +419,11 @@ function renderCarousel() {
     item.addEventListener('click', () => openDetailById(n.id));
     carouselTrack.appendChild(item);
   });
-
   if (carouselIndex >= important.length) carouselIndex = 0;
   updateCarouselPosition();
   startCarouselAuto();
 }
-
-function updateCarouselPosition() {
-  carouselTrack.style.transform = `translateX(-${carouselIndex * 100}%)`;
-}
-
+function updateCarouselPosition() { carouselTrack.style.transform = `translateX(-${carouselIndex * 100}%)`; }
 function startCarouselAuto() {
   stopCarouselAuto();
   carouselTimer = setInterval(() => {
@@ -477,13 +433,7 @@ function startCarouselAuto() {
     updateCarouselPosition();
   }, AUTO_CAROUSEL_INTERVAL);
 }
-
-function stopCarouselAuto() {
-  if (carouselTimer) {
-    clearInterval(carouselTimer);
-    carouselTimer = null;
-  }
-}
+function stopCarouselAuto() { if (carouselTimer) { clearInterval(carouselTimer); carouselTimer = null; } }
 
 nextSlideBtn.addEventListener('click', () => {
   const important = newsArray.filter(n => n.isImportant);
@@ -499,36 +449,28 @@ prevSlideBtn.addEventListener('click', () => {
   updateCarouselPosition();
   startCarouselAuto();
 });
-
 document.getElementById('carousel').addEventListener('mouseenter', stopCarouselAuto);
 document.getElementById('carousel').addEventListener('mouseleave', startCarouselAuto);
 
 function renderNewsList() {
-  const queryText = (searchInput.value || '').trim().toLowerCase();
+  const q = (searchInput.value || '').trim().toLowerCase();
   let visible = newsArray.slice();
-
-  if (filteredTag) {
-    visible = visible.filter(n => n.theme === filteredTag);
+  if (filteredTag) visible = visible.filter(n => n.theme === filteredTag);
+  if (q) {
+    visible = visible.filter(n => (n.title && n.title.toLowerCase().includes(q)) ||
+                                  (n.tags && n.tags.join(' ').toLowerCase().includes(q)) ||
+                                  (n.content && n.content.toLowerCase().includes(q)));
   }
-
-  if (queryText) {
-    visible = visible.filter(n => (n.title && n.title.toLowerCase().includes(queryText)) ||
-                                  (n.tags && n.tags.join(' ').toLowerCase().includes(queryText)) ||
-                                  (n.content && n.content.toLowerCase().includes(queryText)));
-  }
-
   visible.sort((a,b) => {
     if (a.isImportant && !b.isImportant) return -1;
     if (!a.isImportant && b.isImportant) return 1;
     return b.createdAt - a.createdAt;
   });
-
   newsList.innerHTML = '';
-  if (visible.length === 0) {
+  if (!visible.length) {
     newsList.innerHTML = `<div style="color:#9fcff6">Nenhuma notícia encontrada.</div>`;
     return;
   }
-
   visible.forEach(n => {
     const row = document.createElement('div');
     row.className = 'news-row';
@@ -546,135 +488,13 @@ function renderNewsList() {
   });
 }
 
-/* ============================
-   Filtrar por tag
-   ============================ */
-
-function setFilterByTag(tag) {
-  filteredTag = tag;
-  const label = tag || 'Todas';
-  currentFilterLabel.textContent = label;
-  Array.from(document.querySelectorAll('.tag-btn')).forEach(btn => {
-    btn.classList.toggle('active', btn.textContent.startsWith(tag || tag));
-  });
-  allTagsBtn.classList.toggle('active', !tag);
-  renderNewsList();
-}
-
-/* ============================
-   Editor: autenticação e manipulação
-   ============================ */
-
-editorToggleBtn.addEventListener('click', () => {
-  const pwd = prompt('Digite a senha do editor:');
-  if (pwd === null) return;
-  if (pwd === ADMIN_PASSWORD) {
-    isAuthenticated = true;
-    editorPanel.style.display = 'flex';
-    editorPanel.scrollIntoView({behavior:'smooth', block:'center'});
-    renderEditorNewsList();
-    renderAll();
-    alert('Editor desbloqueado.');
-  } else {
-    alert('Senha incorreta.');
-  }
-});
-
-newPostBtn.addEventListener('click', () => {
-  if (!isAuthenticated) {
-    editorToggleBtn.click();
-    setTimeout(() => openEditorForNew(), 250);
-  } else {
-    openEditorForNew();
-  }
-});
-
-function openEditorForNew() {
-  editorTitle.value = '';
-  editorImageUrl.value = '';
-  editorContent.value = '';
-  editorImportant.checked = false;
-  editorTagSelect.value = '';
-  editorImageFile.value = '';
-  editorPanel.style.display = 'flex';
-}
-
-/* salvar notícia -> agora salva no Firestore e, se houver, faz upload para Storage */
-saveNewsBtn.addEventListener('click', async (e) => {
-  e.preventDefault();
-  const title = (editorTitle.value || '').trim();
-  const theme = (editorTagSelect.value || '').trim();
-  const content = (editorContent.value || '').trim();
-
-  if (!title || !theme || !content) {
-    alert('Preencha título, tema e conteúdo.');
-    return;
-  }
-
-  const id = generateId();
-  let image = '';
-  let imagePath = null;
-
-  const file = editorImageFile.files && editorImageFile.files[0];
-  if (file) {
-    try {
-      imagePath = `newsImages/${id}_${file.name.replace(/\s+/g,'_')}`;
-      const storageReference = storageRef(storage, imagePath);
-      await uploadBytes(storageReference, file);
-      image = await getDownloadURL(storageReference);
-    } catch (err) {
-      console.error('Erro ao fazer upload da imagem:', err);
-      image = editorImageUrl.value.trim() || '';
-      imagePath = null;
-    }
-  } else {
-    image = editorImageUrl.value.trim() || '';
-    imagePath = null;
-  }
-
-  const newsItem = {
-    title,
-    theme,
-    image,
-    imagePath,
-    content,
-    tags: [theme],
-    isImportant: !!editorImportant.checked,
-    createdAt: serverTimestamp() // grava timestamp do servidor
-  };
-
-  try {
-    // salva com id gerado (setDoc) para facilitar referência do storagePath
-    await setDoc(doc(db, 'news', id), newsItem);
-    alert('Notícia salva!');
-    // limpa editor
-    openEditorForNew();
-    // renderAll será acionado pelo onSnapshot
-  } catch (err) {
-    console.error('Erro ao salvar notícia no Firestore:', err);
-    alert('Erro ao salvar notícia. Veja console.');
-  }
-});
-
-/* cancelar edição */
-cancelEditBtn.addEventListener('click', (e) => {
-  e.preventDefault();
-  editorTitle.value = '';
-  editorImageUrl.value = '';
-  editorContent.value = '';
-  editorImportant.checked = false;
-  editorTagSelect.value = '';
-  editorImageFile.value = '';
-});
-
-/* lista do editor (render) */
 function renderEditorNewsList() {
   editorNewsList.innerHTML = '';
   if (!newsArray.length) {
     editorNewsList.innerHTML = `<div style="color:#9fcff6">Nenhuma notícia cadastrada.</div>`;
     return;
   }
-  newsArray.forEach((n) => {
+  newsArray.forEach(n => {
     const row = document.createElement('div');
     row.style.display = 'flex';
     row.style.justifyContent = 'space-between';
@@ -715,19 +535,140 @@ function renderEditorNewsList() {
   });
 }
 
-async function openEditorForEdit(id) {
-  const docRef = doc(db, 'news', id);
-  const snap = await getDoc(docRef);
-  if (!snap.exists()) return alert('Notícia não encontrada.');
-  const n = docToNews(snap);
-  editorTitle.value = n.title;
-  editorTagSelect.value = n.theme;
-  editorImageUrl.value = n.image || '';
-  editorContent.value = n.content;
-  editorImportant.checked = !!n.isImportant;
-  editorImageFile.value = '';
+/* ============================
+   Filtrar por tag
+   ============================ */
+function setFilterByTag(tag) {
+  filteredTag = tag;
+  currentFilterLabel.textContent = tag || 'Todas';
+  Array.from(document.querySelectorAll('.tag-btn')).forEach(btn => {
+    btn.classList.toggle('active', btn.textContent.startsWith(tag || ''));
+  });
+  allTagsBtn.classList.toggle('active', !tag);
+  renderNewsList();
+}
 
-  // substitui handler do save para atualização
+/* ============================
+   Editor: autenticação e UI
+   ============================ */
+editorToggleBtn.addEventListener('click', () => {
+  const pwd = prompt('Digite a senha do editor:');
+  if (pwd === null) return;
+  if (pwd === ADMIN_PASSWORD) {
+    isAuthenticated = true;
+    editorPanel.style.display = 'flex';
+    editorPanel.scrollIntoView({behavior:'smooth', block:'center'});
+    renderEditorNewsList();
+    renderAll();
+    alert('Editor desbloqueado.');
+  } else {
+    alert('Senha incorreta.');
+  }
+});
+
+newPostBtn.addEventListener('click', () => {
+  if (!isAuthenticated) {
+    editorToggleBtn.click();
+    setTimeout(() => openEditorForNew(), 250);
+  } else openEditorForNew();
+});
+
+function openEditorForNew() {
+  editorTitle.value = '';
+  editorImageUrl.value = '';
+  editorContent.value = '';
+  editorImportant.checked = false;
+  editorTagSelect.value = '';
+  editorImageFile.value = '';
+  editorPanel.style.display = 'flex';
+}
+
+/* ============================
+   Save (create) news
+   ============================ */
+saveNewsBtn.addEventListener('click', async (e) => {
+  e.preventDefault();
+  if (!isAuthenticated) {
+    alert('Você precisa ativar o modo editor com a senha.');
+    return;
+  }
+
+  const title = (editorTitle.value || '').trim();
+  const theme = (editorTagSelect.value || '').trim();
+  const content = (editorContent.value || '').trim();
+  const isImportant = !!editorImportant.checked;
+  const imageUrlInput = editorImageUrl.value.trim();
+  const file = editorImageFile.files && editorImageFile.files[0];
+
+  if (!title || !theme || !content) {
+    alert('Preencha título, tema e conteúdo.');
+    return;
+  }
+
+  // gerar id para facilitar path da imagem
+  const id = generateId();
+  let finalImageUrl = imageUrlInput || '';
+  let imagePath = null;
+
+  if (file) {
+    try {
+      const safeName = `${id}_${file.name.replace(/\s+/g,'_')}`;
+      const storageReference = storageRef(storage, `newsImages/${safeName}`);
+      await uploadBytes(storageReference, file);
+      finalImageUrl = await getDownloadURL(storageReference);
+      imagePath = storageReference.fullPath;
+    } catch (err) {
+      console.error('Erro upload imagem:', err);
+      finalImageUrl = imageUrlInput || '';
+      imagePath = null;
+    }
+  }
+
+  const newsItem = {
+    title,
+    theme,
+    image: finalImageUrl || '',
+    imagePath: imagePath || null,
+    content,
+    tags: [theme],
+    isImportant,
+    createdAt: serverTimestamp()
+  };
+
+  try {
+    // usa setDoc com id gerado para manter consistência
+    await setDoc(doc(db, 'news', id), newsItem);
+    alert('Notícia salva!');
+    openEditorForNew();
+    // onSnapshot atualiza a lista automaticamente
+  } catch (err) {
+    console.error('Erro ao salvar notícia:', err);
+    alert('Erro ao salvar notícia. Veja console.');
+  }
+});
+
+/* ============================
+   Editar notícia (preenche formulário e atualiza)
+   ============================ */
+async function openEditorForEdit(id) {
+  try {
+    const dRef = doc(db, 'news', id);
+    const snap = await getDoc(dRef);
+    if (!snap.exists()) return alert('Notícia não encontrada.');
+    const d = snap.data();
+    editorTitle.value = d.title || '';
+    editorTagSelect.value = d.theme || '';
+    editorImageUrl.value = d.image || '';
+    editorContent.value = d.content || '';
+    editorImportant.checked = !!d.isImportant;
+    editorImageFile.value = '';
+  } catch (err) {
+    console.error('Erro ao abrir edição:', err);
+    alert('Erro ao abrir edição. Veja console.');
+    return;
+  }
+
+  // override do botão salvar para atualizar
   const originalHandler = saveNewsBtn.onclick;
   saveNewsBtn.onclick = async (ev) => {
     ev.preventDefault();
@@ -738,79 +679,166 @@ async function openEditorForEdit(id) {
       alert('Preencha título, tema e conteúdo.');
       return;
     }
-    let image = n.image || '';
-    let imagePath = n.imagePath || null;
-
     const file = editorImageFile.files && editorImageFile.files[0];
-    if (file) {
+
+    try {
+      const dRef = doc(db, 'news', ev.target.dataset.editId || null);
+      // But we need the actual id — we'll instead capture id via closure:
+    } catch (e) {
+      // noop
+    }
+  };
+
+  // simpler approach: create a dedicated update flow with captured id
+  const idToEdit = id;
+
+  // temporary handler
+  const tempHandler = async (ev) => {
+    ev.preventDefault();
+    const title = (editorTitle.value || '').trim();
+    const theme = (editorTagSelect.value || '').trim();
+    const content = (editorContent.value || '').trim();
+    const isImportantVal = !!editorImportant.checked;
+    const file2 = editorImageFile.files && editorImageFile.files[0];
+
+    if (!title || !theme || !content) {
+      alert('Preencha título, tema e conteúdo.');
+      return;
+    }
+
+    // fetch current doc to know previous imagePath
+    const dRef = doc(db, 'news', idToEdit);
+    let current = {};
+    try {
+      const snap = await getDoc(dRef);
+      if (snap.exists()) current = snap.data();
+    } catch (err) {
+      console.warn('Não foi possível buscar documento atual:', err);
+    }
+
+    let finalImageUrl = current.image || editorImageUrl.value.trim() || '';
+    let imagePath = current.imagePath || null;
+
+    if (file2) {
       try {
-        // se já tinha imagem no storage, deletar antiga (opcional) — vamos deletar só depois do upload bem sucedido
-        const newImagePath = `newsImages/${id}_${file.name.replace(/\s+/g,'_')}`;
-        const storageReference = storageRef(storage, newImagePath);
-        await uploadBytes(storageReference, file);
-        const newImageUrl = await getDownloadURL(storageReference);
-
-        // se tinha imagem anterior no storage, tenta deletar
+        const safeName = `${idToEdit}_${file2.name.replace(/\s+/g,'_')}`;
+        const storageReference = storageRef(storage, `newsImages/${safeName}`);
+        await uploadBytes(storageReference, file2);
+        finalImageUrl = await getDownloadURL(storageReference);
+        const newPath = storageReference.fullPath;
+        // delete old image if existed
         if (imagePath) {
-          try {
-            await deleteObject(storageRef(storage, imagePath));
-          } catch (e) {
-            console.warn('Falha ao deletar imagem antiga (pode não existir):', e);
-          }
+          try { await deleteObject(storageRef(storage, imagePath)); } catch (e) { console.warn('Não foi possível deletar imagem antiga:', e); }
         }
-
-        image = newImageUrl;
-        imagePath = newImagePath;
+        imagePath = newPath;
       } catch (err) {
-        console.error('Erro ao fazer upload da imagem:', err);
+        console.error('Erro upload imagem na edição:', err);
         alert('Erro ao enviar imagem. Mantendo imagem anterior ou URL informado.');
       }
     } else {
-      // se usuário mudou só a URL
-      image = editorImageUrl.value.trim() || image;
+      finalImageUrl = editorImageUrl.value.trim() || finalImageUrl;
     }
 
     try {
-      await updateDoc(doc(db, 'news', id), {
+      await updateDoc(doc(db, 'news', idToEdit), {
         title,
         theme,
-        image,
-        imagePath,
         content,
+        image: finalImageUrl || '',
+        imagePath: imagePath || null,
         tags: [theme],
-        isImportant: !!editorImportant.checked
+        isImportant: isImportantVal
       });
       alert('Notícia atualizada!');
-      // restaura handler padrão
-      saveNewsBtn.onclick = originalHandler;
+      saveNewsBtn.removeEventListener('click', tempHandler);
+      // restaura listener padrão (rebind novo listener)
+      bindSaveListenerDefault();
       openEditorForNew();
     } catch (err) {
-      console.error('Erro ao atualizar notícia:', err);
+      console.error('Erro ao atualizar:', err);
       alert('Erro ao atualizar notícia. Veja console.');
     }
   };
+
+  // remove any previous temp handlers to avoid duplicates, then attach
+  saveNewsBtn.removeEventListener('click', tempHandler);
+  saveNewsBtn.addEventListener('click', tempHandler);
 }
 
-/* conversão de file para dataURL (mantive caso queira) */
-function fileToDataUrl(file) {
-  return new Promise((resolve, reject) => {
-    const fr = new FileReader();
-    fr.onload = () => resolve(fr.result);
-    fr.onerror = reject;
-    fr.readAsDataURL(file);
+/* helper to rebind default save (in case overwritten) */
+function bindSaveListenerDefault() {
+  // remove all listeners by cloning button
+  const newBtn = saveNewsBtn.cloneNode(true);
+  saveNewsBtn.parentNode.replaceChild(newBtn, saveNewsBtn);
+  // reassign references
+  window.saveNewsBtn = document.getElementById('saveNewsBtn');
+  // attach default handler
+  window.saveNewsBtn.addEventListener('click', async (e) => {
+    e.preventDefault();
+    if (!isAuthenticated) { alert('Você precisa ativar o modo editor com a senha.'); return; }
+    const title = (editorTitle.value || '').trim();
+    const theme = (editorTagSelect.value || '').trim();
+    const content = (editorContent.value || '').trim();
+    const isImportant = !!editorImportant.checked;
+    const imageUrlInput = editorImageUrl.value.trim();
+    const file = editorImageFile.files && editorImageFile.files[0];
+    if (!title || !theme || !content) { alert('Preencha título, tema e conteúdo.'); return; }
+    const id = generateId();
+    let finalImageUrl = imageUrlInput || '';
+    let imagePath = null;
+    if (file) {
+      try {
+        const safeName = `${id}_${file.name.replace(/\s+/g,'_')}`;
+        const storageReference = storageRef(storage, `newsImages/${safeName}`);
+        await uploadBytes(storageReference, file);
+        finalImageUrl = await getDownloadURL(storageReference);
+        imagePath = storageReference.fullPath;
+      } catch (err) {
+        console.error('Erro upload imagem:', err);
+        finalImageUrl = imageUrlInput || '';
+        imagePath = null;
+      }
+    }
+    try {
+      await setDoc(doc(db, 'news', id), {
+        title, theme, image: finalImageUrl || '', imagePath: imagePath || null,
+        content, tags: [theme], isImportant, createdAt: serverTimestamp()
+      });
+      alert('Notícia salva!');
+      openEditorForNew();
+    } catch (err) {
+      console.error('Erro ao salvar notícia:', err);
+      alert('Erro ao salvar notícia. Veja console.');
+    }
   });
+}
+// bind default on load:
+bindSaveListenerDefault();
+
+/* ============================
+   Delete (Firestore + Storage)
+   ============================ */
+async function deleteNewsById(id, imagePath) {
+  try {
+    if (imagePath) {
+      try { await deleteObject(storageRef(storage, imagePath)); } catch (e) { console.warn('Falha deleting storage:', e); }
+    }
+    await deleteDoc(doc(db, 'news', id));
+    alert('Notícia excluída.');
+  } catch (err) {
+    console.error('Erro ao excluir notícia:', err);
+    alert('Erro ao excluir notícia. Veja console.');
+  }
 }
 
 /* ============================
-   Detalhe da notícia (página dinâmica em tela cheia)
+   Detalhe & close
    ============================ */
-
 function openDetailById(id) {
   const item = newsArray.find(n => n.id === id);
   if (!item) return alert('Notícia não encontrada.');
 
   detailView.classList.add('fullscreen');
-
   detailContent.innerHTML = `
     <div style="background:transparent; padding:18px; border-radius:8px;">
       <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;">
@@ -824,7 +852,6 @@ function openDetailById(id) {
           <button class="btn" id="deleteThisBtn" style="background:#b30000;color:white;">Excluir</button>` : ''}
         </div>
       </div>
-
       ${item.image ? `<img src="${item.image}" alt="imagem" onerror="this.style.display='none'">` : ''}
       <div style="color:#dff7ff; white-space:pre-line; margin-top:12px;">${escapeHtmlPreserveNewlines(item.content)}</div>
       <div style="margin-top:12px;">${(item.tags||[]).map(t => `<span class="tag-pill">#${t}</span>`).join('')}</div>
@@ -834,112 +861,32 @@ function openDetailById(id) {
   if (isAuthenticated) {
     const editBtn = document.getElementById('editThisBtn');
     const delBtn = document.getElementById('deleteThisBtn');
-    if (editBtn) {
-      editBtn.addEventListener('click', () => {
-        editorPanel.style.display = 'flex';
-        openEditorForEdit(item.id);
-        editorPanel.scrollIntoView({behavior:'smooth', block:'center'});
-      });
-    }
-    if (delBtn) {
-      delBtn.addEventListener('click', () => {
-        if (confirm('Deseja excluir esta notícia?')) {
-          deleteNewsById(item.id, item.imagePath).then(() => {
-            closeDetail();
-          });
-        }
-      });
-    }
+    if (editBtn) editBtn.addEventListener('click', () => { editorPanel.style.display = 'flex'; openEditorForEdit(item.id); editorPanel.scrollIntoView({behavior:'smooth', block:'center'}); });
+    if (delBtn) delBtn.addEventListener('click', () => { if (confirm('Deseja excluir esta notícia?')) deleteNewsById(item.id, item.imagePath).then(closeDetail); });
   }
-
   detailView.scrollTop = 0;
 }
 
 backToListBtn.addEventListener('click', closeDetail);
-function closeDetail() {
-  detailView.classList.remove('fullscreen');
-  detailContent.innerHTML = '';
-  document.querySelector('main').scrollIntoView({behavior:'smooth', block:'start'});
-}
+function closeDetail() { detailView.classList.remove('fullscreen'); detailContent.innerHTML = ''; document.querySelector('main').scrollIntoView({behavior:'smooth', block:'start'}); }
 
 /* ============================
-   Deletar notícia (Firestore + Storage)
+   Busca e utilitários
    ============================ */
-async function deleteNewsById(id, imagePath) {
-  try {
-    // deleta imagem no Storage se existir
-    if (imagePath) {
-      try {
-        await deleteObject(storageRef(storage, imagePath));
-      } catch (e) {
-        console.warn('Falha ao excluir arquivo do Storage (pode já ter sido removido):', e);
-      }
-    }
-    // deleta doc no Firestore
-    await deleteDoc(doc(db, 'news', id));
-    alert('Notícia excluída.');
-  } catch (err) {
-    console.error('Erro ao excluir notícia:', err);
-    alert('Erro ao excluir notícia. Veja console.');
-  }
-}
-
-/* ============================
-   Busca
-   ============================ */
-searchBtn.addEventListener('click', () => {
-  renderNewsList();
-});
-searchInput.addEventListener('keypress', (e) => {
-  if (e.key === 'Enter') renderNewsList();
-});
-
-/* ============================
-   Utilitários & helpers
-   ============================ */
+searchBtn.addEventListener('click', () => renderNewsList());
+searchInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') renderNewsList(); });
 
 function renderAll() {
   renderCarousel();
   renderNewsList();
-  renderEditorNewsList();
+  if (isAuthenticated) renderEditorNewsList();
   renderTagCounts();
-}
-
-function formatDate(ts) {
-  const d = new Date(ts);
-  return `${d.getDate().toString().padStart(2,'0')}/${(d.getMonth()+1).toString().padStart(2,'0')}/${d.getFullYear()} ${d.getHours().toString().padStart(2,'0')}:${d.getMinutes().toString().padStart(2,'0')}`;
-}
-
-function truncateText(text, n) {
-  if (!text) return '';
-  return text.length > n ? text.slice(0,n-1) + '…' : text;
-}
-
-function stripHtml(html) {
-  return (html || '').replace(/<[^>]*>/g, '');
-}
-
-function escapeHtml(text) {
-  if (!text) return '';
-  return text
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#039;');
-}
-
-function escapeHtmlPreserveNewlines(text) {
-  return escapeHtml(text).replace(/\n/g, '<br>');
 }
 
 function renderTagCounts() {
   const counts = {};
   FIXED_TAGS.forEach(t => counts[t] = 0);
-  newsArray.forEach(n => {
-    if (n.theme && counts[n.theme] !== undefined) counts[n.theme] += 1;
-  });
-
+  newsArray.forEach(n => { if (n.theme && counts[n.theme] !== undefined) counts[n.theme] += 1; });
   const btns = document.querySelectorAll('.tag-btn');
   btns.forEach(btn => {
     const base = btn.textContent.split(' (')[0];
@@ -949,10 +896,20 @@ function renderTagCounts() {
   });
 }
 
-/* ============================
-   bootstrap & sample inicial
-   ============================ */
+function formatDate(ts) {
+  const d = new Date(ts);
+  return `${d.getDate().toString().padStart(2,'0')}/${(d.getMonth()+1).toString().padStart(2,'0')}/${d.getFullYear()} ${d.getHours().toString().padStart(2,'0')}:${d.getMinutes().toString().padStart(2,'0')}`;
+}
 
+function truncateText(text, n) { if (!text) return ''; return text.length > n ? text.slice(0,n-1) + '…' : text; }
+function stripHtml(html) { return (html || '').replace(/<[^>]*>/g, ''); }
+function escapeHtml(text) { if (!text) return ''; return text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#039;'); }
+function escapeHtmlPreserveNewlines(text) { return escapeHtml(text).replace(/\n/g,'<br>'); }
+function generateId() { return Date.now().toString(36) + Math.random().toString(36).slice(2,8); }
+
+/* ============================
+   Inicialização
+   ============================ */
 function bootstrap() {
   renderAll();
   allTagsBtn.classList.add('active');
@@ -960,26 +917,6 @@ function bootstrap() {
 }
 bootstrap();
 
-/* Se não houver notícias no Firestore (coleção vazia), você pode optar por injetar exemplos.
-   Aqui mantive a versão que não escreve automaticamente no Firestore para não criar dados indesejados. */
-
-/* ============================
-   Pequenas proteções
-   ============================ */
-window.addEventListener('beforeunload', () => {
-  // nada a salvar localmente — Firestore é a fonte
-});
-
-/* ============================
-   Util: id gerador (mantive igual)
-   ============================ */
-function generateId() {
-  return Date.now().toString(36) + Math.random().toString(36).slice(2,8);
-}
-
-/* ============================
-   Fim do módulo
-   ============================ */
 </script>
 
 </body>
