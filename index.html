@@ -279,9 +279,50 @@
     </aside>
   </main>
 
-<script>
+<!-- ============================
+     SCRIPT PRINCIPAL (agora como module — integra Firebase)
+     ============================ -->
+<script type="module">
 /* ============================
-   Configurações iniciais
+   Firebase: App, Analytics, Firestore, Storage
+   ============================ */
+
+/* IMPORTS (CDN oficial) */
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-app.js";
+import { getAnalytics } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-analytics.js";
+import {
+  getFirestore, collection, doc, setDoc, addDoc, getDoc, getDocs, onSnapshot,
+  query, orderBy, serverTimestamp, updateDoc, deleteDoc
+} from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
+import {
+  getStorage, ref as storageRef, uploadBytes, getDownloadURL, deleteObject
+} from "https://www.gstatic.com/firebasejs/10.13.0/firebase-storage.js";
+
+/* Seu Firebase config (mantive a sua) */
+const firebaseConfig = {
+  apiKey: "AIzaSyB4OI3ztWRTYyUahJ9PKmzSpRkFvD9p73s",
+  authDomain: "aofweb-8ece3.firebaseapp.com",
+  projectId: "aofweb-8ece3",
+  storageBucket: "aofweb-8ece3.firebasestorage.app",
+  messagingSenderId: "141492852619",
+  appId: "1:141492852619:web:939b08282d56fc13fe018e",
+  measurementId: "G-L1PCBJ05GC"
+};
+
+/* Inicializa Firebase */
+const firebaseApp = initializeApp(firebaseConfig);
+const analytics = getAnalytics(firebaseApp);
+const db = getFirestore(firebaseApp);
+const storage = getStorage(firebaseApp);
+
+/* Disponibiliza globalmente se quiser inspecionar via console */
+window.firebaseApp = firebaseApp;
+window.firebaseAnalytics = analytics;
+window.firebaseDb = db;
+window.firebaseStorage = storage;
+
+/* ============================
+   Configurações iniciais (UI e lógica)
    ============================ */
 
 const FIXED_TAGS = [
@@ -327,7 +368,7 @@ const editorImageUrl = document.getElementById('editorImageUrl');
 const editorContent = document.getElementById('editorContent');
 const editorImportant = document.getElementById('editorImportant');
 
-let newsArray = JSON.parse(localStorage.getItem('newsArray') || '[]'); // array de notícias
+let newsArray = []; // agora vindo do Firestore
 let filteredTag = null; // tag atual selecionada (null = todas)
 let carouselIndex = 0;
 let carouselTimer = null;
@@ -337,7 +378,6 @@ let isAuthenticated = false; // flag: apenas quando usuário autenticou com senh
    Inicialização UI
    ============================ */
 
-// Preenche lista de tags fixas no sidebar
 function initTagsUI() {
   tagsList.innerHTML = '';
   FIXED_TAGS.forEach(tag => {
@@ -349,34 +389,52 @@ function initTagsUI() {
     });
     tagsList.appendChild(btn);
   });
-  // "Todas as Tags" botão também no topo
   allTagsBtn.addEventListener('click', () => {
     setFilterByTag(null);
   });
-
-  // Popula select do editor
   editorTagSelect.innerHTML = `<option value="" disabled selected>Selecione uma tag</option>` +
     FIXED_TAGS.map(t => `<option value="${t}">${t}</option>`).join('');
 }
-
-// Chamada inicial
 initTagsUI();
 
 /* ============================
-   Salvamento / leitura
+   Helpers Firestore <-> UI
    ============================ */
 
-function saveToStorage() {
-  localStorage.setItem('newsArray', JSON.stringify(newsArray));
-}
-
-function generateId() {
-  // id simples incremental (timestamp + random)
-  return Date.now().toString(36) + Math.random().toString(36).slice(2,8);
+function docToNews(docSnap) {
+  const d = docSnap.data();
+  const createdAt = d && d.createdAt && typeof d.createdAt.toMillis === 'function'
+    ? d.createdAt.toMillis()
+    : (d.createdAt || Date.now());
+  return {
+    id: docSnap.id,
+    title: d.title || '',
+    theme: d.theme || '',
+    image: d.image || '',
+    imagePath: d.imagePath || null, // caminho no Storage (se houver)
+    content: d.content || '',
+    tags: d.tags || [],
+    isImportant: !!d.isImportant,
+    createdAt
+  };
 }
 
 /* ============================
-   Render: CAROUSEL e LIST
+   Observando coleção 'news' (em tempo real)
+   ============================ */
+const newsCollection = collection(db, 'news');
+const newsQuery = query(newsCollection, orderBy('createdAt', 'desc'));
+onSnapshot(newsQuery, (snapshot) => {
+  newsArray = snapshot.docs.map(docToNews);
+  // se não tiver notícias, não sobrescreve o sample (vamos manter o sample inicial em Firestore só se necessário)
+  renderAll();
+}, (err) => {
+  console.error('Erro ao receber notícias do Firestore:', err);
+  // em caso de erro, pode-se considerar fallback para localStorage (omiti para manter o Firestore como fonte única)
+});
+
+/* ============================
+   Render: CAROUSEL e LIST (mantive suas funções)
    ============================ */
 
 function renderCarousel() {
@@ -401,11 +459,8 @@ function renderCarousel() {
     carouselTrack.appendChild(item);
   });
 
-  // reset index if out of bounds
   if (carouselIndex >= important.length) carouselIndex = 0;
   updateCarouselPosition();
-
-  // start auto rotate
   startCarouselAuto();
 }
 
@@ -430,7 +485,6 @@ function stopCarouselAuto() {
   }
 }
 
-/* next / prev */
 nextSlideBtn.addEventListener('click', () => {
   const important = newsArray.filter(n => n.isImportant);
   if (important.length <= 1) return;
@@ -446,31 +500,23 @@ prevSlideBtn.addEventListener('click', () => {
   startCarouselAuto();
 });
 
-/* pause on hover */
 document.getElementById('carousel').addEventListener('mouseenter', stopCarouselAuto);
 document.getElementById('carousel').addEventListener('mouseleave', startCarouselAuto);
 
-/* ============================
-   Render: news list (vertical)
-   ============================ */
-
 function renderNewsList() {
-  const query = (searchInput.value || '').trim().toLowerCase();
-  let visible = newsArray.slice(); // copy
+  const queryText = (searchInput.value || '').trim().toLowerCase();
+  let visible = newsArray.slice();
 
-  // filter by tag
   if (filteredTag) {
     visible = visible.filter(n => n.theme === filteredTag);
   }
 
-  // search filter
-  if (query) {
-    visible = visible.filter(n => (n.title && n.title.toLowerCase().includes(query)) ||
-                                  (n.tags && n.tags.join(' ').toLowerCase().includes(query)) ||
-                                  (n.content && n.content.toLowerCase().includes(query)));
+  if (queryText) {
+    visible = visible.filter(n => (n.title && n.title.toLowerCase().includes(queryText)) ||
+                                  (n.tags && n.tags.join(' ').toLowerCase().includes(queryText)) ||
+                                  (n.content && n.content.toLowerCase().includes(queryText)));
   }
 
-  // Sort: important first, then newest
   visible.sort((a,b) => {
     if (a.isImportant && !b.isImportant) return -1;
     if (!a.isImportant && b.isImportant) return 1;
@@ -495,7 +541,6 @@ function renderNewsList() {
         <div class="news-tags">${(n.tags || []).map(t => `<span class="tag-pill">#${t}</span>`).join('')}</div>
       </div>
     `;
-    // abre detail em tela cheia ao clicar
     row.addEventListener('click', () => openDetailById(n.id));
     newsList.appendChild(row);
   });
@@ -509,11 +554,9 @@ function setFilterByTag(tag) {
   filteredTag = tag;
   const label = tag || 'Todas';
   currentFilterLabel.textContent = label;
-  // atualizar visual dos botões
   Array.from(document.querySelectorAll('.tag-btn')).forEach(btn => {
-    btn.classList.toggle('active', btn.textContent.startsWith(tag || tag)); // will be updated by renderTagCounts
+    btn.classList.toggle('active', btn.textContent.startsWith(tag || tag));
   });
-  // update top "Todas as Tags" btn style
   allTagsBtn.classList.toggle('active', !tag);
   renderNewsList();
 }
@@ -523,27 +566,23 @@ function setFilterByTag(tag) {
    ============================ */
 
 editorToggleBtn.addEventListener('click', () => {
-  // pede senha via prompt somente quando clicar
   const pwd = prompt('Digite a senha do editor:');
-  if (pwd === null) return; // cancelado
+  if (pwd === null) return;
   if (pwd === ADMIN_PASSWORD) {
-    // habilitar editor
     isAuthenticated = true;
     editorPanel.style.display = 'flex';
     editorPanel.scrollIntoView({behavior:'smooth', block:'center'});
     renderEditorNewsList();
-    renderAll(); // atualiza interface (botões de editar/excluir no detalhe)
+    renderAll();
     alert('Editor desbloqueado.');
   } else {
     alert('Senha incorreta.');
   }
 });
 
-/* botão + Nova Notícia também abre editor (se não autenticado pede senha) */
 newPostBtn.addEventListener('click', () => {
   if (!isAuthenticated) {
     editorToggleBtn.click();
-    // slight delay to ensure editor shows before clearing
     setTimeout(() => openEditorForNew(), 250);
   } else {
     openEditorForNew();
@@ -551,7 +590,6 @@ newPostBtn.addEventListener('click', () => {
 });
 
 function openEditorForNew() {
-  // limpa campos para uma nova notícia
   editorTitle.value = '';
   editorImageUrl.value = '';
   editorContent.value = '';
@@ -561,7 +599,7 @@ function openEditorForNew() {
   editorPanel.style.display = 'flex';
 }
 
-/* salvar notícia */
+/* salvar notícia -> agora salva no Firestore e, se houver, faz upload para Storage */
 saveNewsBtn.addEventListener('click', async (e) => {
   e.preventDefault();
   const title = (editorTitle.value || '').trim();
@@ -573,38 +611,49 @@ saveNewsBtn.addEventListener('click', async (e) => {
     return;
   }
 
+  const id = generateId();
   let image = '';
-  // se enviou arquivo, converte para dataURL
+  let imagePath = null;
+
   const file = editorImageFile.files && editorImageFile.files[0];
   if (file) {
     try {
-      image = await fileToDataUrl(file);
+      imagePath = `newsImages/${id}_${file.name.replace(/\s+/g,'_')}`;
+      const storageReference = storageRef(storage, imagePath);
+      await uploadBytes(storageReference, file);
+      image = await getDownloadURL(storageReference);
     } catch (err) {
-      console.error(err);
+      console.error('Erro ao fazer upload da imagem:', err);
       image = editorImageUrl.value.trim() || '';
+      imagePath = null;
     }
   } else {
     image = editorImageUrl.value.trim() || '';
+    imagePath = null;
   }
 
   const newsItem = {
-    id: generateId(),
     title,
     theme,
     image,
+    imagePath,
     content,
     tags: [theme],
     isImportant: !!editorImportant.checked,
-    createdAt: Date.now()
+    createdAt: serverTimestamp() // grava timestamp do servidor
   };
 
-  // adicionar ao início para aparecer primeiro
-  newsArray.unshift(newsItem);
-  saveToStorage();
-  renderAll();
-  openEditorForNew();
-  renderEditorNewsList();
-  alert('Notícia salva!');
+  try {
+    // salva com id gerado (setDoc) para facilitar referência do storagePath
+    await setDoc(doc(db, 'news', id), newsItem);
+    alert('Notícia salva!');
+    // limpa editor
+    openEditorForNew();
+    // renderAll será acionado pelo onSnapshot
+  } catch (err) {
+    console.error('Erro ao salvar notícia no Firestore:', err);
+    alert('Erro ao salvar notícia. Veja console.');
+  }
 });
 
 /* cancelar edição */
@@ -618,14 +667,14 @@ cancelEditBtn.addEventListener('click', (e) => {
   editorImageFile.value = '';
 });
 
-/* lista de notícias no painel do editor para excluir ou editar (só visível quando autenticado) */
+/* lista do editor (render) */
 function renderEditorNewsList() {
   editorNewsList.innerHTML = '';
   if (!newsArray.length) {
     editorNewsList.innerHTML = `<div style="color:#9fcff6">Nenhuma notícia cadastrada.</div>`;
     return;
   }
-  newsArray.forEach((n, idx) => {
+  newsArray.forEach((n) => {
     const row = document.createElement('div');
     row.style.display = 'flex';
     row.style.justifyContent = 'space-between';
@@ -654,10 +703,7 @@ function renderEditorNewsList() {
     delBtn.textContent = 'Excluir';
     delBtn.addEventListener('click', () => {
       if (confirm('Deseja realmente excluir esta notícia?')) {
-        newsArray = newsArray.filter(item => item.id !== n.id);
-        saveToStorage();
-        renderAll();
-        renderEditorNewsList();
+        deleteNewsById(n.id, n.imagePath);
       }
     });
 
@@ -669,9 +715,11 @@ function renderEditorNewsList() {
   });
 }
 
-function openEditorForEdit(id) {
-  const n = newsArray.find(x => x.id === id);
-  if (!n) return alert('Notícia não encontrada.');
+async function openEditorForEdit(id) {
+  const docRef = doc(db, 'news', id);
+  const snap = await getDoc(docRef);
+  if (!snap.exists()) return alert('Notícia não encontrada.');
+  const n = docToNews(snap);
   editorTitle.value = n.title;
   editorTagSelect.value = n.theme;
   editorImageUrl.value = n.image || '';
@@ -679,7 +727,7 @@ function openEditorForEdit(id) {
   editorImportant.checked = !!n.isImportant;
   editorImageFile.value = '';
 
-  // set save button to update this item
+  // substitui handler do save para atualização
   const originalHandler = saveNewsBtn.onclick;
   saveNewsBtn.onclick = async (ev) => {
     ev.preventDefault();
@@ -690,31 +738,60 @@ function openEditorForEdit(id) {
       alert('Preencha título, tema e conteúdo.');
       return;
     }
-    let image = '';
+    let image = n.image || '';
+    let imagePath = n.imagePath || null;
+
     const file = editorImageFile.files && editorImageFile.files[0];
     if (file) {
-      image = await fileToDataUrl(file);
+      try {
+        // se já tinha imagem no storage, deletar antiga (opcional) — vamos deletar só depois do upload bem sucedido
+        const newImagePath = `newsImages/${id}_${file.name.replace(/\s+/g,'_')}`;
+        const storageReference = storageRef(storage, newImagePath);
+        await uploadBytes(storageReference, file);
+        const newImageUrl = await getDownloadURL(storageReference);
+
+        // se tinha imagem anterior no storage, tenta deletar
+        if (imagePath) {
+          try {
+            await deleteObject(storageRef(storage, imagePath));
+          } catch (e) {
+            console.warn('Falha ao deletar imagem antiga (pode não existir):', e);
+          }
+        }
+
+        image = newImageUrl;
+        imagePath = newImagePath;
+      } catch (err) {
+        console.error('Erro ao fazer upload da imagem:', err);
+        alert('Erro ao enviar imagem. Mantendo imagem anterior ou URL informado.');
+      }
     } else {
-      image = editorImageUrl.value.trim() || '';
+      // se usuário mudou só a URL
+      image = editorImageUrl.value.trim() || image;
     }
 
-    // atualizar
-    n.title = title;
-    n.theme = theme;
-    n.image = image;
-    n.content = content;
-    n.isImportant = !!editorImportant.checked;
-    n.tags = [theme];
-    saveToStorage();
-    renderAll();
-    renderEditorNewsList();
-    alert('Notícia atualizada!');
-    // restaurar handler padrão
-    saveNewsBtn.onclick = originalHandler;
+    try {
+      await updateDoc(doc(db, 'news', id), {
+        title,
+        theme,
+        image,
+        imagePath,
+        content,
+        tags: [theme],
+        isImportant: !!editorImportant.checked
+      });
+      alert('Notícia atualizada!');
+      // restaura handler padrão
+      saveNewsBtn.onclick = originalHandler;
+      openEditorForNew();
+    } catch (err) {
+      console.error('Erro ao atualizar notícia:', err);
+      alert('Erro ao atualizar notícia. Veja console.');
+    }
   };
 }
 
-/* conversão de file para dataURL */
+/* conversão de file para dataURL (mantive caso queira) */
 function fileToDataUrl(file) {
   return new Promise((resolve, reject) => {
     const fr = new FileReader();
@@ -732,7 +809,6 @@ function openDetailById(id) {
   const item = newsArray.find(n => n.id === id);
   if (!item) return alert('Notícia não encontrada.');
 
-  // Mostrar em tela cheia
   detailView.classList.add('fullscreen');
 
   detailContent.innerHTML = `
@@ -755,7 +831,6 @@ function openDetailById(id) {
     </div>
   `;
 
-  // attach actions only if authenticated
   if (isAuthenticated) {
     const editBtn = document.getElementById('editThisBtn');
     const delBtn = document.getElementById('deleteThisBtn');
@@ -763,34 +838,50 @@ function openDetailById(id) {
       editBtn.addEventListener('click', () => {
         editorPanel.style.display = 'flex';
         openEditorForEdit(item.id);
-        // scroll editor into view (sidebar)
         editorPanel.scrollIntoView({behavior:'smooth', block:'center'});
       });
     }
     if (delBtn) {
       delBtn.addEventListener('click', () => {
         if (confirm('Deseja excluir esta notícia?')) {
-          newsArray = newsArray.filter(n => n.id !== item.id);
-          saveToStorage();
-          renderAll();
-          renderEditorNewsList();
-          closeDetail();
+          deleteNewsById(item.id, item.imagePath).then(() => {
+            closeDetail();
+          });
         }
       });
     }
   }
 
-  // scroll to top of fullscreen
   detailView.scrollTop = 0;
 }
 
-/* voltar */
 backToListBtn.addEventListener('click', closeDetail);
 function closeDetail() {
   detailView.classList.remove('fullscreen');
   detailContent.innerHTML = '';
-  // scroll to top of main content
   document.querySelector('main').scrollIntoView({behavior:'smooth', block:'start'});
+}
+
+/* ============================
+   Deletar notícia (Firestore + Storage)
+   ============================ */
+async function deleteNewsById(id, imagePath) {
+  try {
+    // deleta imagem no Storage se existir
+    if (imagePath) {
+      try {
+        await deleteObject(storageRef(storage, imagePath));
+      } catch (e) {
+        console.warn('Falha ao excluir arquivo do Storage (pode já ter sido removido):', e);
+      }
+    }
+    // deleta doc no Firestore
+    await deleteDoc(doc(db, 'news', id));
+    alert('Notícia excluída.');
+  } catch (err) {
+    console.error('Erro ao excluir notícia:', err);
+    alert('Erro ao excluir notícia. Veja console.');
+  }
 }
 
 /* ============================
@@ -799,7 +890,6 @@ function closeDetail() {
 searchBtn.addEventListener('click', () => {
   renderNewsList();
 });
-
 searchInput.addEventListener('keypress', (e) => {
   if (e.key === 'Enter') renderNewsList();
 });
@@ -811,7 +901,7 @@ searchInput.addEventListener('keypress', (e) => {
 function renderAll() {
   renderCarousel();
   renderNewsList();
-  renderEditorNewsList(); // safe: editor list só aparece se autenticado
+  renderEditorNewsList();
   renderTagCounts();
 }
 
@@ -843,7 +933,6 @@ function escapeHtmlPreserveNewlines(text) {
   return escapeHtml(text).replace(/\n/g, '<br>');
 }
 
-/* mostra contagem por tag na sidebar (opcional) */
 function renderTagCounts() {
   const counts = {};
   FIXED_TAGS.forEach(t => counts[t] = 0);
@@ -851,7 +940,6 @@ function renderTagCounts() {
     if (n.theme && counts[n.theme] !== undefined) counts[n.theme] += 1;
   });
 
-  // atualiza visual dos botões
   const btns = document.querySelectorAll('.tag-btn');
   btns.forEach(btn => {
     const base = btn.textContent.split(' (')[0];
@@ -861,52 +949,36 @@ function renderTagCounts() {
   });
 }
 
-/* safety: strip potential HTML from inputs when rendering lists; use escapeHtml when necessary */
-
 /* ============================
-   Inicialização final
+   bootstrap & sample inicial
    ============================ */
 
-// preencher selects e listas e render inicial
 function bootstrap() {
   renderAll();
-  // marcar "Todas" ativo
   allTagsBtn.classList.add('active');
   setFilterByTag(null);
 }
-
 bootstrap();
 
-/* ============================
-   Exemplos iniciais (apenas se não houver notícias)
-   ============================ */
-if (!newsArray.length) {
-  const sample = [
-    {
-      id: generateId(), title: 'Final eletrizante na Champions League',
-      theme: 'Champions', image: '', content: 'Uma final memorável com virada nos acréscimos.',
-      tags: ['Champions'], isImportant: true, createdAt: Date.now()-1000*60*60*24
-    },
-    {
-      id: generateId(), title: 'Brasileirão esquenta a disputa',
-      theme: 'Brasileirão', image: '', content: 'Clássico decidido por um pênalti nos últimos minutos.',
-      tags: ['Brasileirão'], isImportant: false, createdAt: Date.now()-1000*60*60*8
-    }
-  ];
-  newsArray = sample.concat(newsArray);
-  saveToStorage();
-  renderAll();
-}
+/* Se não houver notícias no Firestore (coleção vazia), você pode optar por injetar exemplos.
+   Aqui mantive a versão que não escreve automaticamente no Firestore para não criar dados indesejados. */
 
 /* ============================
    Pequenas proteções
    ============================ */
 window.addEventListener('beforeunload', () => {
-  saveToStorage();
+  // nada a salvar localmente — Firestore é a fonte
 });
 
 /* ============================
-   Fim
+   Util: id gerador (mantive igual)
+   ============================ */
+function generateId() {
+  return Date.now().toString(36) + Math.random().toString(36).slice(2,8);
+}
+
+/* ============================
+   Fim do módulo
    ============================ */
 </script>
 
